@@ -33,8 +33,7 @@ jobs:
 
       - name: JavaScript syntax
         run: |
-          shopt -s globstar nullglob
-          files=(js/**/*.js sw.js tests/**/*.js)
+          mapfile -t files < <(find . -name '*.js' -not -path './node_modules/*' -not -path './.git/*')
           if [ ${#files[@]} -eq 0 ]; then echo "No JS files yet"; exit 0; fi
           for f in "${files[@]}"; do node --check "$f"; done
           echo "Checked ${#files[@]} file(s)"
