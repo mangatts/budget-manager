@@ -32,20 +32,45 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500) } =
 
   let nextId = 0;
   const pending = new Map();
+  const waiters = [];
   const problems = [];
   ws.addEventListener('message', ({ data }) => {
     const msg = JSON.parse(data);
-    if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+    if (msg.id && pending.has(msg.id)) {
+      const { resolve, reject, timer, method } = pending.get(msg.id);
+      pending.delete(msg.id);
+      clearTimeout(timer);
+      if (msg.error) reject(new Error(`${method}: ${msg.error.message}`));
+      else resolve(msg.result);
+    }
+    for (const w of waiters.filter((x) => x.method === msg.method)) { waiters.splice(waiters.indexOf(w), 1); clearTimeout(w.timer); w.resolve(msg.params); }
     if (msg.method === 'Runtime.exceptionThrown') problems.push(`exception: ${msg.params.exceptionDetails.exception?.description}`);
     if (msg.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(msg.params.type)) problems.push(`console: ${msg.params.args.map((a) => a.value ?? a.description).join(' ')}`);
     if (msg.method === 'Log.entryAdded' && ['error', 'warning'].includes(msg.params.entry.level)) problems.push(`log: ${msg.params.entry.text}`);
   });
 
-  const send = (method, params = {}) => new Promise((resolve) => {
+  // Every command times out with a clear message, so a stuck call can't hang CI.
+  const send = (method, params = {}, timeoutMs = 15000) => new Promise((resolve, reject) => {
     const id = ++nextId;
-    pending.set(id, resolve);
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out after ${timeoutMs}ms`)); }, timeoutMs);
+    pending.set(id, { resolve, reject, timer, method });
     ws.send(JSON.stringify({ id, method, params }));
   });
+  const failAll = (why) => {
+    for (const { reject, timer } of pending.values()) { clearTimeout(timer); reject(new Error(why)); }
+    pending.clear();
+  };
+  ws.addEventListener('close', () => failAll('Chrome connection closed'));
+  ws.addEventListener('error', () => failAll('Chrome connection error'));
+
+  // Resolves on the next event of this type (e.g. the page's load event).
+  const waitFor = (method, timeoutMs = 15000) => new Promise((resolve, reject) => {
+    const waiter = { method, resolve };
+    waiter.timer = setTimeout(() => { waiters.splice(waiters.indexOf(waiter), 1); reject(new Error(`waiting for ${method} timed out`)); }, timeoutMs);
+    waiters.push(waiter);
+  });
+  // Navigate, wait for the real load event, then a short settle for the module script to render.
+  const load = async (start) => { const loaded = waitFor('Page.loadEventFired'); await start(); await loaded; await sleep(150); };
 
   const page = {
     problems,
@@ -53,11 +78,15 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500) } =
     sleep,
     async eval(expression) {
       const res = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
-      if (res.result?.exceptionDetails) throw new Error(`eval failed: ${expression}\n${res.result.exceptionDetails.exception?.description}`);
-      return res.result.result.value;
+      if (res.exceptionDetails) throw new Error(`eval failed: ${expression}\n${res.exceptionDetails.exception?.description}`);
+      return res.result.value;
     },
-    async goto(url) { await send('Page.navigate', { url }); await sleep(700); },
-    async reload() { await send('Page.reload'); await sleep(700); },
+    // Same-document hash changes don't fire a load event, so those wait briefly instead.
+    async goto(url) {
+      const sameDocument = await page.eval(`location.href.split('#')[0] === ${JSON.stringify(url.split('#')[0])} && location.href !== 'about:blank'`);
+      if (sameDocument) { await send('Page.navigate', { url }); await sleep(250); } else await load(() => send('Page.navigate', { url }));
+    },
+    async reload() { await load(() => send('Page.reload')); },
     async key(key, code, keyCode) {
       for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: keyCode });
       await sleep(100);
