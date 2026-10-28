@@ -60,6 +60,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
   - ✅ Done: `index.html` shell with CSP, bottom tab bar, hash router, safe DOM helper (`utils/dom.js`), router tests, `npm start/test/check`.
 - **E0-S2** As a user of any age, I want a clear, readable design so the app is easy to use. *(M)*
   - AC: `tokens.css` with color, type scale (18px base), and spacing tokens; light/dark; AA contrast checked; bottom tab bar mockup. Use the design skills.
+  - ✅ Done: tokens + Atkinson Hyperlegible fonts, light/dark, More → Display (text size + theme, no flash), base components, `#/design` reference; contrast/token/preferences tests.
 - **E0-S3** As a user, I want the app locked down from day one so my data is safe. *(S)*
   - AC: CSP meta, referrer meta, `utils/dom.js` safe helpers, grep check for banned APIs, root `SECURITY.md`.
 - **E0-S4** As a developer, I want the repo on GitHub with Pages, branch protection, secret scanning, and Dependabot. *(S)*

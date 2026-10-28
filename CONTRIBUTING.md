@@ -37,6 +37,7 @@
 - No `innerHTML`, `eval`, inline scripts, or inline event handlers. Build DOM with `utils/dom.js`.
 - No third-party runtime code, CDNs, or network calls.
 - All outside data (forms, CSV, backups) goes through `validate.js`.
-- Money is stored as integer cents.
+- Money is stored as integer cents. Show it with `formatCents()` from `utils/money.js`.
+- Styling: use the tokens in `css/tokens.css` and the classes in `css/components.css`. Never hard-code a color (a test enforces this). Check new UI on `#/design`, in both themes, at Extra large text.
 - Keep PRs small (aim for < 400 changed lines).
 - Never use real financial data in tests, fixtures, or screenshots.
