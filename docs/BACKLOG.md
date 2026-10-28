@@ -51,6 +51,7 @@
 
 ### E0: Foundation
 - **E0-S1** As a developer, I want the folder structure, `index.html` shell, and a local server so we can build quickly. *(S)*
+  - ✅ Done: `index.html` shell with CSP, bottom tab bar, hash router, safe DOM helper (`utils/dom.js`), router tests, `npm start/test/check`.
 - **E0-S2** As a user of any age, I want a clear, readable design so the app is easy to use. *(M)*
   - AC: `tokens.css` with color, type scale (18px base), and spacing tokens; light/dark; AA contrast checked; bottom tab bar mockup. Use the design skills.
 - **E0-S3** As a user, I want the app locked down from day one so my data is safe. *(S)*
