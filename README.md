@@ -1,7 +1,10 @@
 # Budget Manager
 
-A personal budget manager built with plain HTML, CSS, and JavaScript. It runs offline, installs like an app, and stores data on your device so it doesn't reset.
+A private money coach built with plain HTML, CSS, and JavaScript. It tells you what to do next, not just what you spent. It runs offline, installs like an app, and stores data on your device so it doesn't reset.
 
+**Live app:** https://mangatts.github.io/budget-manager/
+
+- [Product vision: what makes it different](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Smart Coach / insights](docs/INSIGHTS.md)
 - [Security plan (NIST-aligned)](docs/SECURITY.md)

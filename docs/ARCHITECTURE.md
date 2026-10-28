@@ -3,6 +3,7 @@
 A personal budget manager built with plain HTML, CSS, and JavaScript. You should be able to use it every day on a laptop and a phone, and your data should never reset. Instead of making you set "expected vs. actual" budgets, it compares your spending to **industry benchmarks** and **learns from your habits** to tell you where to cut back.
 
 **Related docs**
+- [PRODUCT.md](PRODUCT.md): what makes us different (Next Best Step, Safe to Spend, Cut Plan, What-If)
 - [INSIGHTS.md](INSIGHTS.md): how the "smart coach" works (benchmarks → learning → optional AI)
 - [SECURITY.md](SECURITY.md): security plan based on NIST guidelines
 - [BACKLOG.md](BACKLOG.md): Agile process, epics, user stories, sprint plan
