@@ -40,7 +40,7 @@ jobs:
 
       - name: Unit tests
         run: |
-          if [ -d tests ]; then node --test tests/; else echo "No tests yet"; fi
+          if [ -d tests ]; then node --test; else echo "No tests yet"; fi
 
   dependency-review:
     name: dependency-review
