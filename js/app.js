@@ -2,6 +2,7 @@ import { createRouter } from './router.js';
 import { placeholderView } from './views/placeholder.js';
 import { moreView } from './views/more.js';
 import { designView } from './views/design.js';
+import { getStore } from './appStore.js';
 
 const APP_NAME = 'Budget Manager';
 
@@ -29,3 +30,7 @@ createRouter({
   routes,
   appName: APP_NAME,
 }).start();
+
+// Open the on-device database early (creates it and adds default categories on first run).
+// If this browser can't store data, screens that need it will say so.
+getStore().catch(() => document.documentElement.setAttribute('data-storage', 'unavailable'));
