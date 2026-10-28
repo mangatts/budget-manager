@@ -33,8 +33,15 @@ function adapter(db) {
     get: (store, key) => request(db.transaction(store).objectStore(store).get(key)),
     async putMany(store, values) {
       const tx = db.transaction(store, 'readwrite');
-      for (const value of values) tx.objectStore(store).put(value);
-      await committed(tx); // all or nothing
+      const done = committed(tx);
+      try {
+        for (const value of values) tx.objectStore(store).put(value);
+      } catch (error) {
+        tx.abort(); // all or nothing: a bad value cancels the earlier writes too
+        await done.catch(() => {});
+        throw error;
+      }
+      await done;
       return values;
     },
     async put(store, value) {

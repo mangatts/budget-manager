@@ -32,7 +32,8 @@ export function cleanNote(input) {
     .trim();
 }
 
-export function validateTransaction(input, { categories, today }) {
+// keepCategoryId: when editing, the entry's current category stays valid even if it has since been hidden.
+export function validateTransaction(input, { categories, today, keepCategoryId = null }) {
   const errors = {};
   const raw = input && typeof input === 'object' ? input : {};
 
@@ -42,7 +43,7 @@ export function validateTransaction(input, { categories, today }) {
   const amount = Number.isSafeInteger(raw.amountCents) ? validCents(raw.amountCents) : parseAmount(raw.amount);
   if (amount.error) errors.amount = amount.error;
 
-  const category = categories.find((c) => c.id === raw.categoryId && !c.archived);
+  const category = categories.find((c) => c.id === raw.categoryId && (!c.archived || c.id === keepCategoryId));
   if (!category || (type && category.type !== type)) errors.categoryId = 'Pick a category';
 
   const latest = addYears(today, 1);

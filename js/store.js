@@ -63,7 +63,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     async updateTransaction(id, input) {
       const before = state.transactions.find((t) => t.id === id);
       if (!before) return { ok: false, errors: { form: 'This entry no longer exists.' } };
-      const result = validateTransaction(input, { categories: state.categories, today: today() });
+      const result = validateTransaction(input, { categories: state.categories, today: today(), keepCategoryId: before.categoryId });
       if (!result.ok) return result;
       const record = { ...before, ...result.value, updatedAt: now() };
       try {

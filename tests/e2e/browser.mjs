@@ -17,6 +17,11 @@ function chromePath() {
 // the caller then owns deleting it. Otherwise a temporary profile is created and removed on close.
 export const newProfile = () => mkdtempSync(join(tmpdir(), 'bm-e2e-'));
 
+// Best effort: Chrome may still be flushing files for a moment after it exits.
+export function removeProfile(dir) {
+  try { rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* temp dir; the OS cleans it up */ }
+}
+
 export async function launch({ port = 9400 + Math.floor(Math.random() * 500), profile: reuse } = {}) {
   const profile = reuse ?? newProfile();
   const args = ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check'];
@@ -101,7 +106,7 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500), pr
       const exited = new Promise((resolve) => proc.once('exit', resolve));
       proc.kill();
       await Promise.race([exited, sleep(3000)]); // let Chrome flush storage to disk before reuse
-      if (!reuse) rmSync(profile, { recursive: true, force: true });
+      if (!reuse) removeProfile(profile);
     },
   };
 

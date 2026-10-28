@@ -116,6 +116,19 @@ test('stored records are copies: changing a returned record does not change the 
   assert.equal((await repo.get('transactions', record.id)).amountCents, 475);
 });
 
+test('editing an entry whose category was hidden still works; moving to a hidden one does not', async () => {
+  const { store, repo } = await setup();
+  const { record } = await store.addTransaction({ ...coffee, categoryId: 'c-gifts' });
+  const gifts = store.getState().categories.find((c) => c.id === 'c-gifts');
+  await repo.put('categories', { ...gifts, archived: true });
+  await store.init(); // reload categories
+  const edit = await store.updateTransaction(record.id, { ...coffee, categoryId: 'c-gifts', note: 'Fixed note' });
+  assert.equal(edit.ok, true);
+  const { record: other } = await store.addTransaction(coffee);
+  const move = await store.updateTransaction(other.id, { ...coffee, categoryId: 'c-gifts' });
+  assert.equal(move.errors.categoryId, 'Pick a category');
+});
+
 test('repository only allows known stores', async () => {
   const repo = createRepository(createMemoryAdapter());
   assert.throws(() => repo.getAll('__proto__'), /Unknown store/);
