@@ -20,6 +20,7 @@ Story: E?-S?
 
 ## Security (docs/SECURITY.md §5)
 - [ ] No `innerHTML` / `eval` / inline scripts or handlers (`bash scripts/check-security.sh` passes)
+- [ ] Browser checks pass (`npm run e2e`): no console errors or CSP violations
 - [ ] CSP unchanged, or the change is explained above
 - [ ] All new inputs go through `validate.js`, with tests
 - [ ] No secrets, keys, or personal/financial data in code, tests, or screenshots

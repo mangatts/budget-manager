@@ -30,7 +30,7 @@ export function el(tag, attrs = {}, ...children) {
     node.setAttribute(key, value === true ? '' : String(value));
   }
 
-  for (const child of children.flat()) {
+  for (const child of children.flat(Infinity)) {
     if (child === null || child === undefined || child === false) continue;
     node.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }

@@ -42,6 +42,14 @@ jobs:
         run: |
           if [ -d tests ]; then node --test; else echo "No tests yet"; fi
 
+      # Real-browser checks at phone size: routing, keyboard, text sizes, themes,
+      # and zero console errors or CSP violations. Uses the runner's preinstalled Chrome.
+      - name: Browser checks
+        run: |
+          python3 -m http.server 5500 --bind 127.0.0.1 > /dev/null 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:5500/ > /dev/null && break; sleep 0.5; done
+          npm run e2e
+
   dependency-review:
     name: dependency-review
     if: github.event_name == 'pull_request'

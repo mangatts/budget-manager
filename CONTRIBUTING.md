@@ -11,19 +11,20 @@
    - `feat: add expense form`, `fix: reject negative amounts`, `docs: …`, `test: …`, `chore: …`, `security: …`
 4. **Check locally** before pushing:
    ```bash
-   bash scripts/check-security.sh
-   node --test tests/        # once tests exist
+   npm run check             # security guardrails
+   npm test                  # unit tests
+   npm start & npm run e2e   # browser checks at phone size (needs Chrome)
    ```
 5. **Open a PR** and fill in the template checklist.
 6. **Review:** run `/code-review` and `/security-review` in Claude Code, then fix the findings or ticket them.
-7. **Merge** once CI is green and all conversations are resolved. PRs are **squash-merged** and the branch is deleted automatically.
+7. **Merge:** turn on auto-merge (`gh pr merge --auto --squash`). The PR merges itself once every required check is green and all conversations are resolved. PRs are **squash-merged** and the branch is deleted automatically.
 
 ## Rules enforced on `main`
 
 | Rule | Why |
 |---|---|
 | Pull request required | Every change gets reviewed and checked |
-| Required checks: `checks`, `dependency-review` | Security guardrails, JS syntax, unit tests, vulnerable dependencies |
+| Required checks: `checks`, `dependency-review`, `CodeQL` | Security guardrails, JS syntax, unit tests, browser checks, vulnerable dependencies, code scanning |
 | Branch must be up to date with `main` | Checks run against the real result of merging |
 | All review conversations resolved | Nothing is left unanswered |
 | Squash merge only + linear history | One clean commit per story, easy to revert |

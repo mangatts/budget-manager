@@ -130,3 +130,4 @@ Dev-only tools (test runner, linter), if added, are pinned with a lockfile and r
 - [ ] No new third-party runtime code
 - [ ] `/security-review` run on the change, with findings fixed or ticketed
 - [ ] Data stays on the device (no new network calls)
+- [ ] `npm run e2e` passes, with 0 console errors or CSP violations (runs in CI)

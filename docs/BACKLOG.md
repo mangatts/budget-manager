@@ -63,6 +63,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
   - ✅ Done: tokens + Atkinson Hyperlegible fonts, light/dark, More → Display (text size + theme, no flash), base components, `#/design` reference; contrast/token/preferences tests.
 - **E0-S3** As a user, I want the app locked down from day one so my data is safe. *(S)*
   - AC: CSP meta, referrer meta, `utils/dom.js` safe helpers, grep check for banned APIs, root `SECURITY.md`.
+  - ✅ Done: all of the above, plus `el()` unit tests (fake DOM) and **browser checks in CI** (38 checks: routing, keyboard, text sizes, themes, private mode, 0 CSP violations).
 - **E0-S4** As a developer, I want the repo on GitHub with Pages, branch protection, secret scanning, and Dependabot. *(S)*
   - ✅ Done: repo, `main` ruleset, CI (`checks`, `dependency-review`), secret scanning + push protection, Dependabot, PR/issue templates, CONTRIBUTING.md.
   - ✅ Done: GitHub Pages (https://mangatts.github.io/budget-manager/) and CodeQL code scanning (required on `main`).
