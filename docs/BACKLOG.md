@@ -43,7 +43,13 @@
 | E5 | Smart Coach L2 | Personal patterns |
 | E6 | Smart Coach L3 | Learns from feedback, tracks progress |
 | E7 | Bank statement import | CSV → review → categorize |
+| E9 | Safe to Spend + bills | One daily number; recurring bills |
+| E10 | Cut Plan | Monthly 1–2 challenges with progress & wins |
+| E11 | Next Best Step + Money Checkup | Advisor-style "what to do next" and a 0–100 checkup |
+| E12 | What-If | See how small changes affect goals & debt |
 | E8 | AI coach (optional) | Opt-in LLM coach, after a security review |
+
+See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ---
 
@@ -58,7 +64,7 @@
   - AC: CSP meta, referrer meta, `utils/dom.js` safe helpers, grep check for banned APIs, root `SECURITY.md`.
 - **E0-S4** As a developer, I want the repo on GitHub with Pages, branch protection, secret scanning, and Dependabot. *(S)*
   - ✅ Done: repo, `main` ruleset, CI (`checks`, `dependency-review`), secret scanning + push protection, Dependabot, PR/issue templates, CONTRIBUTING.md.
-  - ⏳ Remaining: GitHub Pages (needs `index.html`), plus **CodeQL** code scanning (enable once JS files exist, then add it as a required check).
+  - ✅ Done: GitHub Pages (https://mangatts.github.io/budget-manager/) and CodeQL code scanning (required on `main`).
 
 ### E1: Track money
 - **E1-S1** As a user, I want my data saved in a database so it's still there tomorrow. *(M)*: IndexedDB adapter, repository, store, schema v1, migrations scaffold.
@@ -111,6 +117,27 @@
 - **E7-S5** Review screen: add / skip / undo / finish later *(L, split into review UI + queue persistence)*
 - **E7-S6** Merchant rules + suggestions (highlighted, never pre-selected) *(M)*
 
+### E9: Safe to Spend + bills
+- **E9-S1** As a user, I want to list my recurring bills (rent, phone, subscriptions) so the app knows what's coming. *(M)*
+- **E9-S2** As a user, I want a "Safe to spend today" number on Home so I know what I can spend without a budget. *(M)*
+  - AC: formula in PRODUCT.md §2 ②; updates instantly on every entry; "Why?" shows the math; handles no-income and overspent cases kindly.
+- **E9-S3** As a user, I want a heads-up before a bill is due. *(S)*
+
+### E10: Cut Plan
+- **E10-S1** As a user, I want 1–2 suggested challenges each month based on my spending. *(M)*
+- **E10-S2** As a user, I want to accept or skip a challenge and see my progress on Home. *(M)*
+- **E10-S3** As a user, I want a month-end result that celebrates wins. *(S)*
+
+### E11: Next Best Step + Money Checkup
+- **E11-S1** As a user, I want to (optionally) enter my savings, debts, and goals so advice fits me. *(M)*
+- **E11-S2** As a user, I want to see which money step I'm on and one clear next action. *(L, split by step)*
+- **E11-S3** As a user, I want a monthly Money Checkup score with 🟢🟡🔴 explanations. *(M)*
+
+### E12: What-If
+- **E12-S1** As a user, I want to see how cutting a category changes when I reach a goal. *(M)*
+- **E12-S2** As a user, I want a debt payoff plan showing interest saved by paying extra. *(M)*
+- **E12-S3** As a user, I want to see long-term growth of saving/investing, with clear assumptions. *(S)*
+
 ### E8: AI coach (optional, later)
 - **E8-S0** Security review + design of the proxy and data-sharing *(M)*. **Blocks the rest of E8.**
 - **E8-S1** Opt-in screen explaining exactly what's sent *(S)*
@@ -120,19 +147,21 @@
 
 ## Tentative sprint plan (we'll adjust as we go)
 
-| Sprint | Focus | Stories | Demo goal |
-|---|---|---|---|
-| **0** | Foundation | E0-S1 → S4 | Empty but secure, styled shell live on GitHub Pages |
-| **1** | Track money | E1-S1 → S5 | Add expenses & income, close the browser, they're still there |
-| **2** | Never lose data | E2-S1 → S6, E1-S6 | Installed on phone, works offline, encrypted backup restores |
-| **3** | Home + benchmarks | E3-S1, S2, E4-S1 → S3 | See the 50/30/20 split for real data |
-| **4** | Coach tips | E4-S4, S5, E3-S3, E5-S1 | Home shows top tips with "why" |
-| **5** | Patterns | E5-S2 → S6 | Personalized tips after a month of data |
-| **6** | Learning | E6-S1 → S3 | Feedback changes which tips show |
-| **7–8** | Bank import | E7-S1 → S6 | Import a real statement, categorize it, no duplicates |
-| **Later** | AI coach | E8 | Only after a security review |
+Basic first, then layers (see PRODUCT.md §3).
 
----
+| Sprint | Layer | Stories | Demo goal |
+|---|---|---|---|
+| **0** | Foundation | E0-S1 ✅, E0-S2, E0-S3, E0-S4 | Secure, styled shell live on GitHub Pages |
+| **1** | Basics | E1-S1 → S5 | Add expenses & income; they survive closing the browser |
+| **2** | Basics | E2-S1 → S6, E1-S6 | Installed on phone, works offline, encrypted backup restores |
+| **3** | Know where you stand | E3-S1, S2, E9-S1 → S3, E4-S1 → S3 | Home shows **Safe to Spend Today** + 50/30/20 split |
+| **4** | Know what to cut | E4-S4, S5, E3-S3, E5-S1 → S3 | Smart Coach tips with "Why?" |
+| **5** | Know what to cut | E5-S4 → S6, E10-S1 → S3 | First **Cut Plan** challenge, month-end win |
+| **6** | Know what's next | E11-S1 → S3 | **Next Best Step** + Money Checkup |
+| **7** | See the future | E12-S1 → S3 | What-If sliders and debt payoff plan |
+| **8–9** | Less typing | E7-S1 → S6 | Import a real statement and categorize it |
+| **10** | Smarter | E6-S1 → S3 | Feedback changes which tips show |
+| **Later** | AI coach | E8 | Only after a security review |
 
 ## "No reset" release checklist (every sprint from Sprint 2 on)
 - [ ] Refresh → data still there
