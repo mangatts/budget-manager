@@ -1,0 +1,90 @@
+/* App frame: header, main column, bottom tab bar. */
+
+.app-header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.app-name {
+  font-weight: var(--weight-bold);
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-6);
+}
+
+.tab-bar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: var(--z-tab-bar);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: var(--surface-sunken);
+  border-top: var(--border-width) solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.tab-bar a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--tab-bar-height);
+  min-width: 0;
+  padding: var(--space-1);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.tab-bar a:hover {
+  color: var(--text);
+}
+
+.tab-icon {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+/* Active tab: color + bold + top bar, so it's not color-only. */
+.tab-bar a[aria-current="page"] {
+  color: var(--accent);
+  font-weight: var(--weight-bold);
+  box-shadow: inset 0 var(--focus-width) 0 var(--accent);
+}
+
+/* At Large and Extra large text, the tab bar would take over the screen.
+   Its labels stay at a readable but capped size; the screen content keeps scaling. */
+html[data-text-size="large"] .tab-bar,
+html[data-text-size="xl"] .tab-bar {
+  font-size: 1rem;
+}
+
+html[data-text-size="large"] .tab-bar a,
+html[data-text-size="xl"] .tab-bar a {
+  font-size: 0.75rem;
+}
+
+html[data-text-size="xl"] .tab-icon {
+  font-size: 1rem;
+}
+
+html[data-text-size="xl"] {
+  --tab-bar-height: 3.75rem;
+}
+
+/* A screen: the root of each view. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}

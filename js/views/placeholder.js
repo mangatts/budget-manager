@@ -2,8 +2,8 @@ import { el } from '../utils/dom.js';
 
 // Temporary screen until each feature is built.
 export function placeholderView(title, message) {
-  return el('section', {},
+  return el('div', { class: 'screen' },
     el('h1', { tabindex: '-1' }, title),
-    el('p', {}, message),
+    el('p', { class: 'lead' }, message),
   );
 }
