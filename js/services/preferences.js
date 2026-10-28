@@ -31,16 +31,26 @@ export function loadPrefs(storage = globalThis.localStorage) {
   }
 }
 
-// Returns the new prefs. If storage is blocked (private mode), the choice still applies for this visit.
-export function savePref(name, value, storage = globalThis.localStorage) {
+// Returns the new prefs, built from `current` (what's applied now), not from storage, so that
+// when storage is blocked (private mode) earlier choices from this visit aren't lost.
+export function savePref(name, value, current, storage = globalThis.localStorage) {
   if (!isAllowed(name, value)) throw new Error(`Unknown preference: ${name}=${value}`);
-  const prefs = { ...loadPrefs(storage), [name]: value };
+  const prefs = { ...sanitizePrefs(current), [name]: value };
   try {
     storage.setItem(PREFS_KEY, JSON.stringify(prefs));
   } catch {
     // Not saved; still applied below by the caller.
   }
   return prefs;
+}
+
+// What's applied to the page right now: the source of truth for this visit.
+// (prefs-boot.js applies the saved values at load; savePref + applyPrefs update them.)
+export function readAppliedPrefs(root = document.documentElement) {
+  return sanitizePrefs({
+    textSize: root.getAttribute('data-text-size') ?? DEFAULT_PREFS.textSize,
+    theme: root.getAttribute('data-theme') ?? DEFAULT_PREFS.theme,
+  });
 }
 
 export function applyPrefs(prefs, root = document.documentElement) {

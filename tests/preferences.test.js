@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { sanitizePrefs, loadPrefs, savePref, applyPrefs, DEFAULT_PREFS, PREF_OPTIONS, PREFS_KEY } from '../js/services/preferences.js';
+import { sanitizePrefs, loadPrefs, savePref, applyPrefs, readAppliedPrefs, DEFAULT_PREFS, PREF_OPTIONS, PREFS_KEY } from '../js/services/preferences.js';
 
 function memoryStorage(initial = {}) {
   const data = { ...initial };
@@ -22,8 +22,8 @@ test('junk, missing, and prototype tricks fall back to defaults', () => {
 
 test('save then load round-trips', () => {
   const storage = memoryStorage();
-  savePref('textSize', 'large', storage);
-  savePref('theme', 'light', storage);
+  const afterSize = savePref('textSize', 'large', loadPrefs(storage), storage);
+  savePref('theme', 'light', afterSize, storage);
   assert.deepEqual(loadPrefs(storage), { textSize: 'large', theme: 'light' });
 });
 
@@ -33,15 +33,21 @@ test('corrupt storage loads defaults', () => {
 
 test('blocked storage (private mode) never crashes', () => {
   assert.deepEqual(loadPrefs(throwingStorage), DEFAULT_PREFS);
-  assert.deepEqual(savePref('theme', 'dark', throwingStorage), { ...DEFAULT_PREFS, theme: 'dark' });
+  assert.deepEqual(savePref('theme', 'dark', DEFAULT_PREFS, throwingStorage), { ...DEFAULT_PREFS, theme: 'dark' });
   assert.deepEqual(loadPrefs(undefined), DEFAULT_PREFS);
+});
+
+test('blocked storage keeps earlier choices from this visit', () => {
+  let prefs = savePref('textSize', 'large', DEFAULT_PREFS, throwingStorage);
+  prefs = savePref('theme', 'dark', prefs, throwingStorage);
+  assert.deepEqual(prefs, { textSize: 'large', theme: 'dark' });
 });
 
 test('unknown names or values are rejected when saving', () => {
   const storage = memoryStorage();
-  assert.throws(() => savePref('textSize', 'huge', storage));
-  assert.throws(() => savePref('__proto__', 'x', storage));
-  assert.throws(() => savePref('constructor', 'x', storage));
+  assert.throws(() => savePref('textSize', 'huge', DEFAULT_PREFS, storage));
+  assert.throws(() => savePref('__proto__', 'x', DEFAULT_PREFS, storage));
+  assert.throws(() => savePref('constructor', 'x', DEFAULT_PREFS, storage));
   assert.deepEqual(storage.data, {});
 });
 
@@ -52,6 +58,13 @@ test('applyPrefs sets attributes, and defaults remove them', () => {
   assert.deepEqual(attrs, { 'data-text-size': 'xl', 'data-theme': 'dark' });
   applyPrefs(DEFAULT_PREFS, root);
   assert.deepEqual(attrs, {});
+});
+
+test('readAppliedPrefs reads the page, and ignores tampered attributes', () => {
+  const root = (attrs) => ({ getAttribute: (k) => attrs[k] ?? null });
+  assert.deepEqual(readAppliedPrefs(root({})), DEFAULT_PREFS);
+  assert.deepEqual(readAppliedPrefs(root({ 'data-text-size': 'xl', 'data-theme': 'dark' })), { textSize: 'xl', theme: 'dark' });
+  assert.deepEqual(readAppliedPrefs(root({ 'data-text-size': 'huge', 'data-theme': '<x>' })), DEFAULT_PREFS);
 });
 
 test('prefs-boot.js uses the same storage key and allowed values', () => {

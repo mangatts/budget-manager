@@ -1,7 +1,7 @@
 import { el } from '../utils/dom.js';
 import { formatCents } from '../utils/money.js';
 import { choiceGroup } from '../ui/choiceGroup.js';
-import { loadPrefs, savePref, applyPrefs } from '../services/preferences.js';
+import { readAppliedPrefs, savePref, applyPrefs } from '../services/preferences.js';
 
 const COMING_SOON = [
   ['Backups', 'Save an encrypted copy of your data. Sprint 2.'],
@@ -10,8 +10,11 @@ const COMING_SOON = [
 ];
 
 export function moreView() {
-  const prefs = loadPrefs();
-  const update = (name) => (value) => applyPrefs(savePref(name, value));
+  let prefs = readAppliedPrefs();
+  const update = (name) => (value) => {
+    prefs = savePref(name, value, prefs);
+    applyPrefs(prefs);
+  };
 
   return el('div', { class: 'screen' },
     el('h1', { tabindex: '-1' }, 'More'),
