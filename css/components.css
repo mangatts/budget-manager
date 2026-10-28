@@ -1,0 +1,260 @@
+/* Shared components. Every screen builds from these; see #/design for a live reference. */
+
+/* ── Section: a titled group on a screen ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section-title {
+  font-size: var(--text-lg);
+}
+
+.lead {
+  color: var(--text-muted);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-5);
+  border: var(--border-width-strong) solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast), color var(--duration-fast);
+}
+
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover { background: var(--accent-hover); color: var(--on-accent); }
+
+.btn-secondary { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+.btn-secondary:hover { background: var(--accent-soft); }
+
+.btn-quiet { background: transparent; color: var(--accent); }
+.btn-quiet:hover { background: var(--accent-soft); }
+
+.btn-danger { background: var(--surface); color: var(--critical); border-color: var(--critical); }
+.btn-danger:hover { background: var(--critical-soft); }
+
+.btn-block { width: 100%; }
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ── Form fields: label above, hint and error below ── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field-label {
+  font-weight: var(--weight-bold);
+}
+
+.field-hint {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.field-error {
+  color: var(--critical);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.field-error::before {
+  content: "⚠ ";
+}
+
+.input {
+  min-height: var(--tap);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--text);
+  border: var(--border-width-strong) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+.input-money {
+  font-family: var(--font-money);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--critical);
+}
+
+/* ── Choice chips: big radio buttons (text size, category, money in/out) ── */
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choices legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-weight: var(--weight-bold);
+}
+
+.choice {
+  position: relative;
+  display: inline-flex;
+}
+
+.choice input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.choice span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  color: var(--text);
+  border: var(--border-width-strong) solid var(--border-strong);
+  border-radius: var(--radius-pill);
+}
+
+/* Selected: color + border + check mark, so it's not color-only. */
+.choice input:checked + span {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: var(--weight-bold);
+}
+
+.choice input:checked + span::before {
+  content: "✓";
+}
+
+.choice input:focus-visible + span {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ── Lists: plain rows, not cards ── */
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.list-row-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.list-row-sub {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ── Money: monospaced digits that line up, with a sign (never color alone) ── */
+.money {
+  font-family: var(--font-money);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.money-in { color: var(--money-in); }
+.money-out { color: var(--text); }
+
+.money-hero {
+  font-size: var(--text-hero);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+/* ── Status pills: icon + words + color ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.pill-good { background: var(--good-soft); color: var(--good); }
+.pill-warning { background: var(--warning-soft); color: var(--warning); }
+.pill-critical { background: var(--critical-soft); color: var(--critical); }
+
+/* ── Card: only for one distinct object (a tip, a summary), not every block ── */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+}
+
+/* ── Rows of buttons or pills that wrap on small screens ── */
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ── Design page swatches ── */
+.swatch-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.swatch {
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+/* The last row in a card doesn't need a divider under it. */
+.card .list-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}

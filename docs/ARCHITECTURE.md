@@ -188,9 +188,14 @@ budget-manager/
 ├── manifest.json
 ├── sw.js
 ├── css/
-│   ├── tokens.css          # design tokens: colors, sizes, spacing
-│   └── styles.css
+│   ├── tokens.css          # design tokens: colors (light/dark), type, space, text sizes
+│   ├── fonts.css           # self-hosted Atkinson Hyperlegible Next & Mono
+│   ├── base.css            # reset, typography, focus, reduced motion
+│   ├── layout.css          # header, screen column, tab bar
+│   └── components.css      # buttons, fields, choices, lists, money, pills, cards
+├── fonts/                  # .woff2 files + OFL licenses
 ├── js/
+│   ├── prefs-boot.js       # applies saved text size/theme before first paint
 │   ├── app.js
 │   ├── router.js
 │   ├── store.js
@@ -208,11 +213,16 @@ budget-manager/
 │   │   │   ├── csvParser.js
 │   │   │   ├── bankFormats.js
 │   │   │   └── suggest.js
+│   │   ├── preferences.js  # text size + theme (allow-listed, localStorage)
 │   │   ├── backup.js
 │   │   ├── crypto.js
 │   │   ├── validate.js
 │   │   └── migrations.js
+│   ├── ui/
+│   │   └── choiceGroup.js  # shared components built with utils/dom.js
 │   ├── views/
+│   │   ├── design.js       # #/design reference page (hidden route)
+│   │   ├── more.js         # More → Display settings
 │   │   ├── home.js
 │   │   ├── addTransaction.js
 │   │   ├── history.js
@@ -222,6 +232,7 @@ budget-manager/
 │   └── utils/
 │       ├── money.js        # USD formatting (Intl.NumberFormat)
 │       ├── dates.js
+│       ├── contrast.js     # WCAG contrast ratio (tests + design page)
 │       ├── dom.js          # safe element helpers (no innerHTML)
 │       └── id.js           # crypto.randomUUID()
 ├── tests/                  # insights + validation + crypto unit tests
@@ -266,16 +277,23 @@ Upload CSV → Validate (size/type/rows) → Parse → Mask account #s → Dedup
 
 | Guideline | How |
 |---|---|
-| Readable | 18px base font. Text size setting: Normal / Large / Extra Large. |
+| Readable | 18px base font, Atkinson Hyperlegible. Text size setting: Normal (18px) / Large (21.6px) / Extra large (25.2px), with no flash on load. |
 | Easy to tap | Targets ≥ 48×48px, well spaced. |
 | Plain language | "Money in / Money out", "Needs / Wants / Savings". No jargon. |
 | Contrast | WCAG 2.2 AA. Never color alone: warnings use an icon + words. |
 | Labels | Every icon has a text label. |
 | Forgiving | Undo after delete. Confirm destructive actions. |
 | Accessible | Semantic HTML, keyboard usable, screen-reader tested, respects "reduce motion". |
-| Light & dark | Follows the device setting. |
+| Light & dark | Follows the device by default; More → Display can force Light or Dark. |
 
-**Design process:** in Sprint 0, set up `tokens.css` (colors, type scale, spacing) using the design skills, and use the **dataviz** skill for every chart (like the 50/30/20 bar).
+**Design system (built in E0-S2):**
+- **Font:** Atkinson Hyperlegible Next for text and Atkinson Hyperlegible Mono for money, both by the Braille Institute for low-vision readers. Self-hosted, 52 KB total.
+- **Colors:** a deep teal accent and teal-tinted neutrals.
+- **No-shame money colors:** money in is green with a "+". Money out uses the normal text color with a "−".
+- **Status colors:** good, warning and critical, always shown with an icon and words.
+- **Where it lives:** everything is in `css/tokens.css`. Tests enforce AA contrast in both themes and ban hard-coded colors elsewhere.
+- **Live reference:** the `#/design` page.
+- **Charts:** use the **dataviz** skill for every chart (like the 50/30/20 bar).
 
 ---
 
