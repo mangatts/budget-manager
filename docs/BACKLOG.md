@@ -70,7 +70,9 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E1: Track money
 - **E1-S1** As a user, I want my data saved in a database so it's still there tomorrow. *(M)*: IndexedDB adapter, repository, store, schema v1, migrations scaffold.
+  - ✅ Done: `js/db/` (IndexedDB + memory adapters, repository), `js/store.js` (validated add/update/delete with undo), `validate.js`, local-date utils; verified across a full browser restart.
 - **E1-S2** As a user, I want default categories set up for me so I can start right away. *(S)*
+  - ✅ Done: 21 defaults (16 money out with needs/wants/savings bucket, 5 money in), seeded once.
 - **E1-S3** As a user, I want to add an expense in under 5 seconds. *(M)*
   - AC: keypad opens first; category buttons; date defaults to today; validation errors in plain words.
 - **E1-S4** As a user, I want to record income so the app knows what I earn. *(S)*
