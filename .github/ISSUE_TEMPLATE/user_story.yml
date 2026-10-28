@@ -1,0 +1,38 @@
+name: User story
+description: A feature from the backlog
+title: "[E?-S?] "
+labels: [story]
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: Epic
+      placeholder: "E1: Track money"
+    validations:
+      required: true
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      value: "As a ___, I want ___ so that ___."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: "- [ ] "
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options: ["S (≤ half day)", "M (1–2 days)", "L (split it!)"]
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security / privacy notes
+      description: New inputs? New stored data? Anything touching files, backups, or crypto?
