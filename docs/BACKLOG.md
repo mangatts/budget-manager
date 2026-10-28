@@ -56,6 +56,8 @@
 - **E0-S3** As a user, I want the app locked down from day one so my data is safe. *(S)*
   - AC: CSP meta, referrer meta, `utils/dom.js` safe helpers, grep check for banned APIs, root `SECURITY.md`.
 - **E0-S4** As a developer, I want the repo on GitHub with Pages, branch protection, secret scanning, and Dependabot. *(S)*
+  - ✅ Done: repo, `main` ruleset, CI (`checks`, `dependency-review`), secret scanning + push protection, Dependabot, PR/issue templates, CONTRIBUTING.md.
+  - ⏳ Remaining: GitHub Pages (needs `index.html`), plus **CodeQL** code scanning (enable once JS files exist, then add it as a required check).
 
 ### E1: Track money
 - **E1-S1** As a user, I want my data saved in a database so it's still there tomorrow. *(M)*: IndexedDB adapter, repository, store, schema v1, migrations scaffold.

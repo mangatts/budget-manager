@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege: jobs can only read the repo unless they ask for more.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Actions are pinned to full commit SHAs (supply-chain hardening); Dependabot keeps them updated.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+
+      - name: Security guardrails
+        run: bash scripts/check-security.sh
+
+      - name: JavaScript syntax
+        run: |
+          mapfile -t files < <(find . -name '*.js' -not -path './node_modules/*' -not -path './.git/*')
+          if [ ${#files[@]} -eq 0 ]; then echo "No JS files yet"; exit 0; fi
+          for f in "${files[@]}"; do node --check "$f"; done
+          echo "Checked ${#files[@]} file(s)"
+
+      - name: Unit tests
+        run: |
+          if [ -d tests ]; then node --test tests/; else echo "No tests yet"; fi
+
+  dependency-review:
+    name: dependency-review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
