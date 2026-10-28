@@ -13,8 +13,17 @@ function chromePath() {
   return existsSync(mac) ? mac : 'google-chrome';
 }
 
-export async function launch({ port = 9400 + Math.floor(Math.random() * 500) } = {}) {
-  const profile = mkdtempSync(join(tmpdir(), 'bm-e2e-'));
+// Pass `profile` to reuse a browser profile across launches (to test data surviving a restart);
+// the caller then owns deleting it. Otherwise a temporary profile is created and removed on close.
+export const newProfile = () => mkdtempSync(join(tmpdir(), 'bm-e2e-'));
+
+// Best effort: Chrome may still be flushing files for a moment after it exits.
+export function removeProfile(dir) {
+  try { rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* temp dir; the OS cleans it up */ }
+}
+
+export async function launch({ port = 9400 + Math.floor(Math.random() * 500), profile: reuse } = {}) {
+  const profile = reuse ?? newProfile();
   const args = ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check'];
   // GitHub's Ubuntu runners block Chrome's sandbox (AppArmor); only relax it there.
   if (process.env.CI) args.push('--no-sandbox');
@@ -92,7 +101,13 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500) } =
       await sleep(100);
     },
     colorScheme: (value) => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value }] }),
-    async close() { ws.close(); proc.kill(); await sleep(200); rmSync(profile, { recursive: true, force: true }); },
+    async close() {
+      ws.close();
+      const exited = new Promise((resolve) => proc.once('exit', resolve));
+      proc.kill();
+      await Promise.race([exited, sleep(3000)]); // let Chrome flush storage to disk before reuse
+      if (!reuse) removeProfile(profile);
+    },
   };
 
   await send('Runtime.enable');

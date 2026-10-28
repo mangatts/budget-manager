@@ -136,8 +136,10 @@ All money is stored as **integer cents** (`1250` = $12.50).
   bucket: "need" | "want" | "savings", // used by the 50/30/20 benchmark
   benchmarkKey: "food_away",           // links to benchmark table
   icon: "🍽️",
+  order: 7,                            // display order
   archived: false
 }
+// Default ids are stable ("c-dining") so future migrations can find them.
 
 // profile (single record; optional, makes benchmarks more accurate)
 {
@@ -198,10 +200,12 @@ budget-manager/
 │   ├── prefs-boot.js       # applies saved text size/theme before first paint
 │   ├── app.js
 │   ├── router.js
-│   ├── store.js
+│   ├── store.js            # state + validated actions (each returns undo)
+│   ├── appStore.js         # the app's single store on IndexedDB
 │   ├── db/
-│   │   ├── repository.js
-│   │   └── indexeddb.js
+│   │   ├── repository.js   # the only data interface (allowed stores only)
+│   │   ├── indexeddb.js    # versioned migrations; never edit a released one
+│   │   └── memory.js       # same interface, for unit tests
 │   ├── services/
 │   │   ├── insights/
 │   │   │   ├── benchmarks.js
@@ -214,6 +218,7 @@ budget-manager/
 │   │   │   ├── bankFormats.js
 │   │   │   └── suggest.js
 │   │   ├── preferences.js  # text size + theme (allow-listed, localStorage)
+│   │   ├── categories.js   # defaults, seeded once
 │   │   ├── backup.js
 │   │   ├── crypto.js
 │   │   ├── validate.js

@@ -1,12 +1,13 @@
 // Browser acceptance checks at iPhone size (390×844). Runs locally and in CI.
 //   npm start            (in another terminal)
 //   npm run e2e          (or: BASE_URL=https://… node tests/e2e/run.mjs)
-import { launch } from './browser.mjs';
+import { launch, newProfile } from './browser.mjs';
 import { shellSuite } from './shell.e2e.mjs';
 import { displaySuite } from './display.e2e.mjs';
+import { dataSuite } from './data.e2e.mjs';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5500/';
-const suites = [['App shell', shellSuite], ['Display settings', displaySuite]];
+const suites = [['App shell', shellSuite], ['Display settings', displaySuite], ['On-device data', dataSuite]];
 
 let failed = 0;
 for (const [name, suite] of suites) {
@@ -17,7 +18,7 @@ for (const [name, suite] of suites) {
     if (!ok) failed++;
   };
   try {
-    await suite({ page, check, base: BASE });
+    await suite({ page, check, base: BASE, launch, newProfile });
     check('No console errors, exceptions, or CSP violations', page.problems.length === 0, page.problems.join(' | '));
   } catch (error) {
     check(`${name} crashed`, false, error.message);
