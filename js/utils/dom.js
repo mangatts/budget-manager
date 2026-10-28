@@ -1,14 +1,20 @@
 // Safe DOM helpers. All UI is built with these instead of HTML strings,
 // so user data (notes, merchant names, CSV text) can never become markup.
 
-const BLOCKED_PROPS = new Set(['innerhtml', 'outerhtml', 'srcdoc']);
-const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
-const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+// srcset/ping take URL lists or send requests; nothing in this app needs them.
+const BLOCKED_PROPS = new Set(['innerhtml', 'outerhtml', 'srcdoc', 'srcset', 'ping']);
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'data', 'cite', 'background']);
 
-// Only same-origin relative URLs and #fragments are allowed (blocks javascript:, data:, https://…).
-export function isSafeUrl(value) {
-  const url = String(value).trim();
-  return !HAS_SCHEME.test(url) && !url.startsWith('//');
+// Only same-origin URLs are allowed (blocks javascript:, data:, https://other.site, …).
+// Resolving with the URL parser, rather than a regex, applies the browser's own cleanup
+// (stripped tabs/newlines/control chars, "\" read as "/"), so tricks like "java\nscript:" or "/\evil.com" fail.
+export function isSafeUrl(value, base = globalThis.location?.href) {
+  try {
+    const baseUrl = new URL(base);
+    return new URL(String(value), baseUrl).origin === baseUrl.origin;
+  } catch {
+    return false;
+  }
 }
 
 // el('p', { class: 'note' }, 'Hello ', el('strong', {}, name))
