@@ -217,7 +217,7 @@ budget-manager/
 │   │   ├── indexeddb.js    # versioned migrations; never edit a released one
 │   │   └── memory.js       # same interface, for unit tests
 │   ├── services/
-│   │   ├── insights/       # benchmarkData.js, month.js, safeToSpend.js (built); tips later
+│   │   ├── insights/       # benchmarkData.js, month.js, safeToSpend.js, split.js (built); tips later
 │   │   │   ├── benchmarks.js
 │   │   │   ├── benchmarkData.js   # the numbers + sources
 │   │   │   ├── patterns.js

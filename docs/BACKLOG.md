@@ -111,6 +111,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E4-S2** As a user, I want to enter my take-home pay (or have it estimated) so comparisons are accurate. *(S)*
   - ✅ Done: More → Your money (take-home + savings %, default 20%); otherwise the median of the last 3 months of money in.
 - **E4-S3** As a user, I want to see my Needs / Wants / Savings split against 50/30/20. *(M)*
+  - ✅ Done: meters on Home (dataviz skill: same-hue tracks, guideline markers, status = color + ⚠ + words, focus/hover readout, table view); shown after 5 entries + income.
 - **E4-S4** As a user, I want tips on which categories are above the guideline and how much I'd save. *(M)*
 - **E4-S5** As a user, I want "Why am I seeing this?" on every tip. *(S)*
 
