@@ -4,6 +4,7 @@
 import { monthKey, shiftMonth, addDays } from '../../utils/dates.js';
 import { inMonth, incomeForMonth } from './month.js';
 import { SPENDING_BENCHMARKS, INCOME_BENCHMARKS, CATEGORY_BENCHMARK, BLS_2024 } from './benchmarkData.js';
+import { rankTips } from './learning.js';
 
 const MIN_ENTRIES = 10; // fewer and the mix says more about timing than habits
 const MIN_SPENDING = 30000; // $300 in the window
@@ -330,12 +331,14 @@ function dollars(cents) {
 export function coachStatus(state, today) {
   const tips = coachTips(state, today);
   if (tips.length) return { tips, reason: null };
+  if (state.feedback?.length && coachTips({ ...state, feedback: [] }, today).length) return { tips, reason: 'hidden' };
   const window = spendingWindow(state.transactions, today);
   const enough = window && window.entries.length >= MIN_ENTRIES && sum(window.entries) >= MIN_SPENDING;
   return { tips, reason: enough ? 'none' : 'not-enough' };
 }
 
-// All tips, most valuable first. Score = monthly money freed × confidence.
+// All tips, most useful first. Score = monthly money freed × confidence × your feedback weight (level 3).
+// Feedback is applied BEFORE one-tip-per-topic, so hiding a tip lets another valid tip on that topic through.
 export function coachTips(state, today) {
   const tips = [
     ...paceTips(state, today), ...mixTips(state, today), ...housingTip(state, today),
@@ -343,9 +346,10 @@ export function coachTips(state, today) {
     ...repeatingTips(state, today), ...spikeTips(state, today),
   ]
     .map((t) => ({ ...t, score: Math.round(t.estimatedMonthlySavingsCents * t.confidence) }));
+  const ranked = rankTips(tips, state.feedback ?? [], today);
   // One tip per topic: if dining out is both "above typical" and "running ahead", keep the stronger one.
   const seen = new Set();
-  return tips.sort((a, b) => b.score - a.score).filter((t) => {
+  return ranked.filter((t) => {
     const perCategory = ['pace', 'higher_than_usual', 'best_month'].includes(t.type);
     const topic = perCategory ? CATEGORY_BENCHMARK[state.categories.find((c) => c.id === t.key)?.benchmarkKey] ?? t.key : t.key;
     if (seen.has(topic)) return false;

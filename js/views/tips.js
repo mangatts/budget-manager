@@ -5,7 +5,7 @@ import { todayLocal, monthKey } from '../utils/dates.js';
 import { getStore } from '../appStore.js';
 import { coachTips, coachStatus, MIN_DAY_FIRST_MONTH } from '../services/insights/engine.js';
 import { tipCard, resultCard, disclaimer } from '../ui/tipCard.js';
-import { rankTips, onItResults } from '../services/insights/learning.js';
+import { onItResults } from '../services/insights/learning.js';
 import { categoryChart } from '../ui/categoryChart.js';
 import { cutPlanSection } from '../ui/cutPlan.js';
 
@@ -21,9 +21,7 @@ function render(body, store) {
       el('h2', { class: 'section-title', id: 'onit-results-title' }, 'How last month went'), results.map(resultCard)));
   }
   body.append(categoryChart(state, monthKey(today)));
-  const status = coachStatus(state, today);
-  const tips = rankTips(status.tips, state.feedback, today);
-  const reason = status.tips.length && !tips.length ? 'hidden' : status.reason;
+  const { tips, reason } = coachStatus(state, today);
   if (reason === 'hidden') {
     body.append(el('div', { class: 'card', id: 'tips-empty' },
       el('h2', { class: 'section-title' }, 'You’ve set this month’s tips aside'),
@@ -41,7 +39,7 @@ function render(body, store) {
     // Tips can overlap (coffee runs are part of Dining Out), so don't add them up: name the biggest.
     const biggest = Math.max(...tips.map((t) => t.estimatedMonthlySavingsCents));
     body.append(
-      el('p', { class: 'lead', id: 'tips-summary' }, `${tips.length} ${tips.length === 1 ? 'idea' : 'ideas'}, biggest first.${biggest > 0 ? ` The biggest could free up about ${formatCents(Math.round(biggest / 100) * 100)} a month.` : ''}`),
+      el('p', { class: 'lead', id: 'tips-summary' }, `${tips.length} ${tips.length === 1 ? 'idea' : 'ideas'}, most useful first.${biggest > 0 ? ` The biggest could free up about ${formatCents(Math.round(biggest / 100) * 100)} a month.` : ''}`),
       el('div', { class: 'section', id: 'tips-list' }, tips.map((t) => tipCard(t, store))),
     );
   }
@@ -60,7 +58,7 @@ export function tipsView() {
 // Home shows the top two (never more than three, so it doesn't overwhelm).
 export function topTips(store, today, count = 2) {
   const state = store.getState();
-  const tips = rankTips(coachTips(state, today), state.feedback, today).slice(0, count);
+  const tips = coachTips(state, today).slice(0, count);
   if (!tips.length) return null;
   return el('section', { class: 'section', id: 'home-tips', 'aria-labelledby': 'home-tips-title' },
     el('h2', { class: 'section-title', id: 'home-tips-title' }, 'Where you could cut back'),

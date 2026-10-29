@@ -14,13 +14,14 @@ const fb = (over = {}) => ({ id: '3f6c1a2e-9b7d-4c1e-8a2b-1d2e3f4a5b6c', topic: 
 let n = 0;
 const tx = (categoryId, dollars, date) => ({ id: `t${++n}`, type: 'expense', amountCents: dollars * 100, categoryId, date, note: '', source: 'manual', createdAt: n, updatedAt: n });
 
-test('weights: start at 1, up for 👍 and "on it", down for 👎 and "not now", clamped', () => {
-  assert.deepEqual(weightsFrom([]), {});
+test('weights: start at 1, up for 👍 and "on it", down for 👎, clamped', () => {
+  assert.equal(Object.keys(weightsFrom([])).length, 0);
   assert.equal(weightsFrom([fb()]).pace, 1.25);
   assert.equal(weightsFrom([fb(), fb({ reaction: 'down', createdAt: 2 })]).pace, 1);
   assert.equal(weightsFrom(Array.from({ length: 20 }, (_, i) => fb({ createdAt: i }))).pace, WEIGHT_MAX);
   assert.equal(weightsFrom(Array.from({ length: 20 }, (_, i) => fb({ reaction: 'down', createdAt: i }))).pace, WEIGHT_MIN);
-  assert.ok(Math.abs(weightsFrom([fb({ reaction: 'not-now' })]).pace - 0.9) < 1e-9);
+  assert.equal(weightsFrom([fb({ reaction: 'not-now' })]).pace, 1); // "Not now" only hides, it doesn't count against
+  assert.equal(Object.getPrototypeOf(weightsFrom([fb({ insightType: 'constructor' })])), null);
 });
 
 test('rankTips: money × confidence × your weight; 👎 and "Not now" hide a topic for the month only', () => {
@@ -91,4 +92,36 @@ test('backups carry feedback; ids of deleted categories are dropped, not fatal; 
   for (const bad of [fb({ reaction: 'love' }), fb({ month: '2026-13' }), fb({ insightType: 'Pace!' }), fb({ baselineCents: -1 }), fb({ id: 'x' })]) {
     assert.match(validatePayload(buildPayload({ ...state, feedback: [bad] }, 9)).error, /tip feedback that isn’t valid/, JSON.stringify(bad));
   }
+});
+
+// ── Regression tests (code review) ──
+
+test('hiding a tip lets another valid tip on the same topic through (feedback applies before one-tip-per-topic)', async () => {
+  const { coachTips } = await import('../js/services/insights/engine.js');
+  // Dining out heavy for three months, and running ahead this month: "pace" and "above typical" both fire for dining.
+  const t = [];
+  for (const m of ['2026-07', '2026-08', '2026-09']) for (let d = 10; d < 20; d++) {
+    t.push(tx('c-dining', 40, `${m}-${d}`), tx('c-groceries', 60, `${m}-${d}`), tx('c-gas', 30, `${m}-${d}`));
+  }
+  for (let d = 1; d < 15; d++) t.push(tx('c-dining', 60, `2026-10-${String(d).padStart(2, '0')}`));
+  const state = { transactions: t, categories: DEFAULT_CATEGORIES, meta: {}, bills: [], feedback: [] };
+  const first = coachTips(state, '2026-10-15').filter((x) => tipCategories(x, DEFAULT_CATEGORIES).includes('c-dining'));
+  assert.equal(first.length, 1);
+  const hidden = [fb({ topic: topicOf(first[0]), insightType: first[0].type, month: '2026-10', reaction: 'not-now' })];
+  const after = coachTips({ ...state, feedback: hidden }, '2026-10-15').filter((x) => tipCategories(x, DEFAULT_CATEGORIES).includes('c-dining'));
+  assert.equal(after.length, 1);
+  assert.notEqual(after[0].type, first[0].type);
+});
+
+test('topics aren’t cut short, so long subscription names don’t collide', () => {
+  const a = topicOf(tip({ type: 'repeating', key: `repeat:c-subscriptions:${'x'.repeat(100)}a` }));
+  const b = topicOf(tip({ type: 'repeating', key: `repeat:c-subscriptions:${'x'.repeat(100)}b` }));
+  assert.notEqual(a, b);
+});
+
+test('a backup with two reactions for the same tip and month keeps the latest', () => {
+  const state = { transactions: [], categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), meta: [{ key: 'seededCategories', value: 1 }] };
+  const older = fb({ reaction: 'up', createdAt: 1 });
+  const newer = fb({ id: '4f6c1a2e-9b7d-4c1e-8a2b-1d2e3f4a5b6c', reaction: 'down', createdAt: 2 });
+  assert.deepEqual(validatePayload(buildPayload({ ...state, feedback: [newer, older] }, 9)).data.feedback.map((f) => f.reaction), ['down']);
 });

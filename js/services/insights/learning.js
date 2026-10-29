@@ -6,16 +6,18 @@ import { inMonth } from './month.js';
 import { CATEGORY_BENCHMARK } from './benchmarkData.js';
 
 export const REACTIONS = Object.freeze(['up', 'down', 'on-it', 'not-now']);
-const STEP = { up: 1.25, 'on-it': 1.25, down: 0.8, 'not-now': 0.9 };
+// "Not now" only hides a tip for the month; it doesn't count against that kind of tip.
+const STEP = { up: 1.25, 'on-it': 1.25, down: 0.8, 'not-now': 1 };
 export const WEIGHT_MIN = 0.2;
 export const WEIGHT_MAX = 3;
 
 // The same advice from month to month: "Dining Out is running ahead" is one topic, whatever the month.
-export const topicOf = (tip) => `${tip.type}|${tip.key}`.slice(0, 120);
+export const MAX_TOPIC = 400;
+export const topicOf = (tip) => `${tip.type}|${tip.key}`;
 
-// How much each kind of tip counts for you: starts at 1, ×1.25 for 👍 or "I'm on it", ×0.8 for 👎, ×0.9 for "Not now".
+// How much each kind of tip counts for you: starts at 1, ×1.25 for 👍 or "I'm on it", ×0.8 for 👎.
 export function weightsFrom(feedback) {
-  const weights = {};
+  const weights = Object.create(null); // keyed by restored strings: no prototype to collide with
   for (const f of [...feedback].sort((a, b) => a.createdAt - b.createdAt)) {
     const w = (weights[f.insightType] ?? 1) * STEP[f.reaction];
     weights[f.insightType] = Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, w));

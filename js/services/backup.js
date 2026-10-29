@@ -5,6 +5,7 @@ import { MIGRATIONS } from '../db/indexeddb.js';
 import { MAX_CENTS, MAX_NOTE_LENGTH, MIN_DATE, TYPES, cleanNote, MAX_APR_BPS, EMPLOYER_MATCH } from './validate.js';
 import { isIsoDate } from '../utils/dates.js';
 import { isUuid } from '../utils/id.js';
+import { REACTIONS, MAX_TOPIC } from './insights/learning.js';
 
 export const APP_ID = 'budget-manager';
 // Room for decades of daily entries (~360 bytes each). Saving checks the same limit, so a backup
@@ -150,10 +151,9 @@ function cleanRule(r, categoryTypes) {
 
 // Your reactions to coach tips. Category ids that no longer exist are dropped (not an error), so deleting a
 // category never makes a backup unrestorable.
-const REACTIONS = ['up', 'down', 'on-it', 'not-now'];
 function cleanFeedback(f, categoryTypes) {
   if (!f || typeof f !== 'object') return null;
-  const ok = isUuid(f.id) && typeof f.topic === 'string' && f.topic.length > 0 && f.topic.length <= 120 && !/[\u0000-\u001f]/.test(f.topic)
+  const ok = isUuid(f.id) && typeof f.topic === 'string' && f.topic.length > 0 && f.topic.length <= MAX_TOPIC && !/[\u0000-\u001f]/.test(f.topic)
     && typeof f.insightType === 'string' && /^[a-z_]{1,40}$/.test(f.insightType)
     && typeof f.month === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(f.month) && REACTIONS.includes(f.reaction)
     && Array.isArray(f.categoryIds) && f.categoryIds.length <= 50
@@ -222,6 +222,10 @@ export function validatePayload(payload) {
   const cleanFeedbackList = feedback.map((f) => cleanFeedback(f, categoryTypes));
   if (cleanFeedbackList.includes(null)) return fail('This backup has tip feedback that isn\u2019t valid, so nothing was restored.');
   if (new Set(cleanFeedbackList.map((f) => f.id)).size !== cleanFeedbackList.length) return fail('This backup has repeated tip feedback, so nothing was restored.');
+  // One reaction per tip per month: if a backup has two, keep the latest.
+  const latest = new Map();
+  for (const f of [...cleanFeedbackList].sort((a, b) => a.createdAt - b.createdAt)) latest.set(`${f.month}|${f.topic}`, f);
+  const finalFeedback = [...latest.values()];
 
   const cleanMeta = meta.filter((m) => m && Object.hasOwn(META_RULES, m.key) && META_RULES[m.key](m.value)).map((m) => ({ key: m.key, value: m.value }));
   const exportedAt = isTime(payload.exportedAt) ? payload.exportedAt : null;
@@ -235,7 +239,7 @@ export function validatePayload(payload) {
   const dates = cleanTransactions.map((t) => t.date).sort();
   return {
     ok: true,
-    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges, debts: cleanDebts, goals: cleanGoals, merchantRules: cleanRules, feedback: cleanFeedbackList },
+    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges, debts: cleanDebts, goals: cleanGoals, merchantRules: cleanRules, feedback: finalFeedback },
     summary: { entries: cleanTransactions.length, bills: cleanBills.length, firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null, exportedAt },
   };
 }

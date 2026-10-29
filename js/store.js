@@ -471,14 +471,22 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         baselineCents: reaction === 'on-it' ? usualSpending(state.transactions, categoryIds, today()) : 0,
         createdAt: now(),
       };
-      // Keep well under what a backup accepts (5,000): drop the oldest.
-      const old = !before && state.feedback.length >= MAX_FEEDBACK ? state.feedback.slice(0, state.feedback.length - MAX_FEEDBACK + 1) : [];
-      const write = async (next, drop = []) => {
+      // Keep well under what a backup accepts (5,000): the oldest reactions are pruned first (not part of undo).
+      if (!before && state.feedback.length >= MAX_FEEDBACK) {
+        try {
+          for (const f of state.feedback.slice(0, state.feedback.length - MAX_FEEDBACK + 1)) {
+            await repo.delete('feedback', f.id);
+            set({ feedback: state.feedback.filter((x) => x.id !== f.id) });
+          }
+        } catch {
+          return { ok: false, errors: SAVE_FAILED };
+        }
+      }
+      const write = async (next) => {
         if (next) await repo.put('feedback', next); else await repo.delete('feedback', record.id);
-        for (const f of drop) await repo.delete('feedback', f.id);
-        set({ feedback: [...state.feedback.filter((f) => f.id !== record.id && !drop.includes(f)), ...(next ? [next] : [])].sort(byCreated) });
+        set({ feedback: [...state.feedback.filter((f) => f.id !== record.id), ...(next ? [next] : [])].sort(byCreated) });
       };
-      try { await write(record, old); } catch { return { ok: false, errors: SAVE_FAILED }; }
+      try { await write(record); } catch { return { ok: false, errors: SAVE_FAILED }; }
       return { ok: true, record, undo: async () => { try { await write(before); } catch { throw refuse(SAVE_FAILED.form); } } };
     },
 

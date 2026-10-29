@@ -27,7 +27,7 @@ export async function tipsSuite({ page, check, base }) {
   await page.sleep(300);
   const tips = await page.eval(`[...document.querySelectorAll('#tips-list .tip')].map((t) => ({ title: t.querySelector('h3').textContent, text: t.querySelector('p').textContent }))`);
   const dining = tips.find((t) => t.title.startsWith('Dining Out'));
-  check('Tips appear live, biggest first, with a summary line', tips.length >= 2 && (await text('#tips-summary'))?.includes('biggest first') && (await text('#tips-summary')).includes('The biggest could free up about'), JSON.stringify(tips.map((t) => t.title)));
+  check('Tips appear live, biggest first, with a summary line', tips.length >= 2 && (await text('#tips-summary'))?.includes('most useful first') && (await text('#tips-summary')).includes('The biggest could free up about'), JSON.stringify(tips.map((t) => t.title)));
   check('Dining out tip compares share of SPENDING to typical households, with dollars', dining?.text.startsWith('Dining Out is 20% of your spending. A typical household spends about 6%.') && /free up about \$\d+ a month/.test(dining.text), dining?.text);
   check('Gas (below typical) gets no tip', !tips.some((t) => t.title.startsWith('Gas')));
   check('Shopping (too broad to compare with any typical figure) gets no comparison tip', !tips.some((t) => t.title.startsWith('Shopping is above typical')));
