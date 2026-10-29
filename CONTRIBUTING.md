@@ -11,6 +11,7 @@
    - `feat: add expense form`, `fix: reject negative amounts`, `docs: …`, `test: …`, `chore: …`, `security: …`
 4. **Check locally** before pushing:
    ```bash
+   npm run precache          # after adding/changing app files: refreshes the offline list in sw.js (CI checks it)
    npm run check             # security guardrails
    npm test                  # unit tests
    npm start & npm run e2e   # browser checks at phone size (needs Chrome)
@@ -38,6 +39,7 @@
 - No `innerHTML`, `eval`, inline scripts, or inline event handlers. Build DOM with `utils/dom.js`.
 - No third-party runtime code, CDNs, or network calls.
 - All outside data (forms, CSV, backups) goes through `validate.js`.
+- Offline: the service worker is **off on localhost** so edits show on refresh. To test offline locally, run `localStorage.setItem('bm:dev-sw', '1')` in DevTools and reload (`npm run e2e` does this for you).
 - Money is stored as integer cents. Show it with `formatCents()` from `utils/money.js`.
 - Styling: use the tokens in `css/tokens.css` and the classes in `css/components.css`. Never hard-code a color (a test enforces this). Check new UI on `#/design`, in both themes, at Extra large text.
 - Keep PRs small (aim for < 400 changed lines).

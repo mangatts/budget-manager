@@ -187,8 +187,8 @@ All money is stored as **integer cents** (`1250` = $12.50).
 ```
 budget-manager/
 ├── index.html
-├── manifest.json
-├── sw.js
+├── manifest.json           # install as an app (name, icons, colors)
+├── sw.js                   # offline: caches only our files; updates wait for "Update"
 ├── css/
 │   ├── tokens.css          # design tokens: colors (light/dark), type, space, text sizes
 │   ├── fonts.css           # self-hosted Atkinson Hyperlegible Next & Mono
@@ -218,6 +218,8 @@ budget-manager/
 │   │   │   ├── bankFormats.js
 │   │   │   └── suggest.js
 │   │   ├── preferences.js  # text size + theme (allow-listed, localStorage)
+│   │   ├── pwa.js          # service worker, install prompt, storage persistence
+│   │   ├── history.js      # filter/search/group/totals for History
 │   │   ├── categories.js   # defaults, seeded once
 │   │   ├── backup.js
 │   │   ├── crypto.js
@@ -241,7 +243,7 @@ budget-manager/
 │       ├── dom.js          # safe element helpers (no innerHTML)
 │       └── id.js           # crypto.randomUUID()
 ├── tests/                  # insights + validation + crypto unit tests
-├── icons/
+├── icons/                  # app icons (scripts/make-icons.mjs renders them)
 └── docs/
 ```
 
