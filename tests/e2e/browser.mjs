@@ -59,7 +59,8 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500), pr
   });
 
   // Every command times out with a clear message, so a stuck call can't hang CI.
-  const send = (method, params = {}, timeoutMs = 15000) => new Promise((resolve, reject) => {
+  // 30 s per step (E2E_TIMEOUT to change): generous for a busy laptop, still catches a real hang.
+  const send = (method, params = {}, timeoutMs = Number(process.env.E2E_TIMEOUT) || 30000) => new Promise((resolve, reject) => {
     const id = ++nextId;
     // Say which step stalled, so an intermittent timeout can be traced.
     const what = params.expression ? ` (${params.expression.replace(/\s+/g, ' ').slice(0, 90)})` : params.url ? ` (${params.url})` : '';
@@ -75,7 +76,7 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500), pr
   ws.addEventListener('error', () => failAll('Chrome connection error'));
 
   // Resolves on the next event of this type (e.g. the page's load event).
-  const waitFor = (method, timeoutMs = 15000) => new Promise((resolve, reject) => {
+  const waitFor = (method, timeoutMs = Number(process.env.E2E_TIMEOUT) || 30000) => new Promise((resolve, reject) => {
     const waiter = { method, resolve };
     waiter.timer = setTimeout(() => { waiters.splice(waiters.indexOf(waiter), 1); reject(new Error(`waiting for ${method} timed out`)); }, timeoutMs);
     waiters.push(waiter);

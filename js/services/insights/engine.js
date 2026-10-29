@@ -156,7 +156,7 @@ function paceTips({ transactions, categories, bills = [] }, today) {
     const spent = sum(thisMonth.filter((t) => t.categoryId === c.id));
     if (!spent) continue;
     const usual = usualFor(transactions, c.id, month);
-    if (usual === null) continue;
+    if (!usual) continue; // no usual, or $0 usual: nothing fair to compare with
     const projected = Math.round((spent * daysIn(month)) / day);
     const gain = projected - usual;
     if (projected < usual * PACE_MARGIN || gain < MIN_MONTHLY_GAIN) continue;
@@ -200,7 +200,8 @@ function higherThanUsualTips({ transactions, categories, bills }, today) {
     if (!isEveryday(c, billCats)) continue;
     const spent = sum(inMonth(transactions, last).filter((t) => t.type === 'expense' && t.categoryId === c.id));
     const usual = usualFor(transactions, c.id, last);
-    if (!spent || usual === null || spent < usual * PACE_MARGIN || spent - usual < MIN_MONTHLY_GAIN) continue;
+    // usual === 0 means none in earlier months: a one-off (like holiday gifts), not overspending.
+    if (!spent || !usual || spent < usual * PACE_MARGIN || spent - usual < MIN_MONTHLY_GAIN) continue;
     tips.push({
       id: `higher:${c.id}:${last}`, type: 'higher_than_usual', level: 2, key: c.id,
       title: `${c.name} was higher than usual last month`,
@@ -273,7 +274,8 @@ function repeatingTips({ transactions, categories, bills = [] }, today) {
     groups.get(key).push(t);
   }
   const tips = [];
-  for (const list of groups.values()) {
+  for (const [key, list] of groups) {
+    if (key.endsWith('|')) continue; // no note: different unlabeled purchases, not one subscription
     const amounts = list.map((t) => t.amountCents);
     const typical = median(amounts);
     const steady = list.filter((t) => Math.abs(t.amountCents - typical) <= typical * 0.05);

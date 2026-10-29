@@ -66,3 +66,15 @@ test('per-category topics: the stronger of pace / higher / best-month wins; spik
   const tips = coachTips(state(list), '2026-10-05');
   assert.equal(tips.filter((t) => ['pace', 'higher_than_usual', 'best_month'].includes(t.type) && (t.key === 'c-dining')).length, 1);
 });
+
+test('no "more than your usual $0": one-offs in a new category are not overspending', () => {
+  const list = [tx('2026-06-10', 5000, 'c-dining'), tx('2026-07-10', 5000, 'c-dining'), tx('2026-08-10', 5000, 'c-dining'), tx('2026-09-10', 30000, 'c-gifts')];
+  assert.equal(find(coachTips(state(list), '2026-10-05'), 'higher_than_usual').length, 0);
+  const pace = [tx('2026-08-10', 5000, 'c-dining'), tx('2026-09-10', 5000, 'c-dining'), tx('2026-10-03', 30000, 'c-gifts')];
+  assert.equal(find(coachTips(state(pace), '2026-10-14'), 'pace').length, 0);
+});
+
+test('unlabeled repeated amounts are not called a subscription', () => {
+  const list = ['2026-07-12', '2026-08-12', '2026-09-12'].map((d) => tx(d, 2000, 'c-entertainment', ''));
+  assert.equal(find(coachTips(state(list), '2026-10-14'), 'repeating').length, 0);
+});
