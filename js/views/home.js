@@ -8,6 +8,7 @@ import { showHistoryMonth } from './history.js';
 import { inMonth, monthSummary } from '../services/insights/month.js';
 import { upcomingBills } from '../services/insights/safeToSpend.js';
 import { safeToSpendCard } from '../ui/safeToSpendCard.js';
+import { splitChart } from '../ui/splitChart.js';
 import { billStatusPill } from './bills.js';
 
 // Remembered while the app is open.
@@ -48,6 +49,8 @@ function render(target, state) {
     ),
     leftCents < 0 ? el('p', { class: 'field-hint' }, `You’ve spent ${formatCents(-leftCents)} more than came in this month.`) : null,
   ));
+
+  target.append(splitChart(state, month));
 
   if (!state.meta.monthlyTakeHomeCents) {
     target.append(el('p', { class: 'field-hint' }, 'Tip: ', el('a', { href: '#/profile' }, 'add your take-home pay'), ' for more accurate numbers.'));

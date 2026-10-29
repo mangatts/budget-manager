@@ -1,7 +1,7 @@
 // Safe to spend today (PRODUCT.md §2 ②): one daily number, no budget to set up.
 // Pure functions; money is integer cents. Every step is returned so "Why?" can show the math.
 import { monthKey, addDays } from '../../utils/dates.js';
-import { inMonth, monthlyIncome } from './month.js';
+import { inMonth, incomeForMonth } from './month.js';
 
 const daysIn = (month) => {
   const [y, m] = month.split('-').map(Number);
@@ -54,15 +54,9 @@ export function safeToSpend({ transactions, categories, bills = [], meta }, toda
   const entries = inMonth(transactions, month);
   const savingsCategories = new Set(categories.filter((c) => c.bucket === 'savings').map((c) => c.id));
 
-  const recordedCents = entries.filter((t) => t.type === 'income').reduce((s, t) => s + t.amountCents, 0);
-  const expected = monthlyIncome({ transactions, meta }, month); // entered, or estimated from past months
-  let incomeCents = recordedCents;
-  let incomeSource = 'recorded';
-  if (expected && expected.cents > recordedCents) {
-    incomeCents = expected.cents;
-    incomeSource = expected.estimated ? 'estimated' : 'take-home';
-  }
-  if (incomeCents <= 0) return { available: false, reason: 'no-income' };
+  const income = incomeForMonth({ transactions, meta }, month); // recorded, entered, or estimated
+  if (!income) return { available: false, reason: 'no-income' };
+  const { cents: incomeCents, source: incomeSource, recordedCents } = income;
 
   const savingsPercent = Number.isInteger(meta.savingsPercent) ? meta.savingsPercent : 20;
   const goalCents = Math.round((incomeCents * savingsPercent) / 100);
