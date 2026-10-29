@@ -7,7 +7,11 @@ import { isIsoDate } from '../utils/dates.js';
 import { isUuid } from '../utils/id.js';
 
 export const APP_ID = 'budget-manager';
-export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+// Room for decades of daily entries (~360 bytes each). Saving checks the same limit, so a backup
+// that could never be restored is never made.
+export const MAX_FILE_BYTES = 64 * 1024 * 1024;
+
+export class BackupTooLargeError extends Error {}
 export const MIN_PASSPHRASE = 12;
 const MAX_TRANSACTIONS = 200_000;
 const MAX_CATEGORIES = 500;
@@ -37,9 +41,10 @@ export function buildPayload({ transactions, categories, meta }, now = Date.now(
   };
 }
 
-export async function createBackupFile(state, passphrase, now = Date.now()) {
-  const envelope = await encryptJson(buildPayload(state, now), passphrase);
-  return JSON.stringify(envelope);
+export async function createBackupFile(state, passphrase, now = Date.now(), { maxBytes = MAX_FILE_BYTES } = {}) {
+  const text = JSON.stringify(await encryptJson(buildPayload(state, now), passphrase));
+  if (text.length > maxBytes) throw new BackupTooLargeError('Your data is too large for one backup file.');
+  return text;
 }
 
 // ── Validation of everything inside a backup ──

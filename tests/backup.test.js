@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkPassphrase, buildPayload, validatePayload, createBackupFile, openBackupFile, backupFileName, MAX_FILE_BYTES } from '../js/services/backup.js';
+import { checkPassphrase, buildPayload, validatePayload, createBackupFile, openBackupFile, backupFileName, MAX_FILE_BYTES, BackupTooLargeError } from '../js/services/backup.js';
 import { encryptJson } from '../js/services/crypto.js';
 import { DEFAULT_CATEGORIES } from '../js/services/categories.js';
 
@@ -94,4 +94,10 @@ test('empty backup (no entries yet) is valid', async () => {
   const result = await open(payload(state([])));
   assert.equal(result.ok, true);
   assert.deepEqual(result.summary.entries, 0);
+});
+
+test('a backup too large to restore is never made', async () => {
+  await assert.rejects(createBackupFile(state(), PASS, 1, { maxBytes: 1000 }), BackupTooLargeError);
+  const ok = await createBackupFile(state(), PASS, 1);
+  assert.ok(ok.length <= MAX_FILE_BYTES);
 });

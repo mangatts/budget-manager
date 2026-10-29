@@ -3,7 +3,7 @@ import { el, clear } from '../utils/dom.js';
 import { formatDay, todayLocal } from '../utils/dates.js';
 import { showToast } from '../ui/toast.js';
 import { getStore } from '../appStore.js';
-import { checkPassphrase, createBackupFile, openBackupFile, backupFileName, MAX_FILE_BYTES } from '../services/backup.js';
+import { checkPassphrase, createBackupFile, openBackupFile, backupFileName, MAX_FILE_BYTES, BackupTooLargeError } from '../services/backup.js';
 
 const localDay = (time) => todayLocal(new Date(time));
 
@@ -70,6 +70,8 @@ function saveSection(store) {
   const last = el('p', { class: 'field-hint', id: 'last-backup' });
   const showLast = () => { last.textContent = `Last backup: ${lastBackupText(store.getState().meta.lastBackupAt)}`; };
   showLast();
+  // Stay current if a restore (or its Undo) changes the date while this screen is open.
+  const stop = store.subscribe(() => { if (!last.isConnected) return stop(); showLast(); });
 
   const form = el('form', { class: 'section', novalidate: true, id: 'backup-form' },
     el('p', { class: 'lead' }, 'Saves everything into one file, locked with a passphrase you choose. Keep it somewhere safe, like Files, iCloud Drive, or an email to yourself.'),
@@ -98,14 +100,15 @@ function saveSection(store) {
       const now = Date.now();
       const text = await createBackupFile(store.snapshot(), pass.input.value, now);
       if (await deliver(text, backupFileName(localDay(now)))) {
-        await store.setMeta('lastBackupAt', now);
-        showLast();
         pass.input.value = '';
         confirm.input.value = '';
         showToast({ message: 'Backup saved' });
+        // The file is saved either way; only the "last backup" date depends on this write.
+        await store.setMeta('lastBackupAt', now).catch(() => {});
+        showLast();
       }
-    } catch {
-      showToast({ message: 'Couldn’t make the backup. Please try again.' });
+    } catch (error) {
+      showToast({ message: error instanceof BackupTooLargeError ? 'Your data is too large for one backup file, so no backup was made.' : 'Couldn’t make the backup. Please try again.' });
     } finally {
       button.disabled = false;
       button.textContent = 'Save backup';
@@ -148,6 +151,9 @@ function restoreSection(store) {
     let result;
     try {
       result = await openBackupFile(await file.text(), pass.input.value);
+    } catch {
+      // e.g. the file was moved or changed (iCloud/Files) after it was picked.
+      result = { ok: false, error: 'Couldn’t read this file. Choose it again and retry.' };
     } finally {
       button.disabled = false;
       button.textContent = 'Open backup';
