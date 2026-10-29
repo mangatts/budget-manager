@@ -36,6 +36,10 @@ export const MIGRATIONS = [
     db.createObjectStore('pending', { keyPath: 'id' });
     db.createObjectStore('merchantRules', { keyPath: 'pattern' });
   },
+  // v7: your reactions to coach tips, so it learns what helps (Sprint 10)
+  (db) => {
+    db.createObjectStore('feedback', { keyPath: 'id' });
+  },
 ];
 
 const request = (req) => new Promise((resolve, reject) => {

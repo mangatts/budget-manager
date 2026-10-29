@@ -106,7 +106,7 @@ export function homeView() {
       if (upcoming) todaySlot.append(upcoming);
       const challenges = cutPlanHome(store, today);
       if (challenges) todaySlot.append(challenges);
-      const tips = topTips(state, today);
+      const tips = topTips(store, today);
       if (tips) todaySlot.append(tips);
       label.textContent = formatMonth(month);
       render(body, state);

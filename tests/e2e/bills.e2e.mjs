@@ -49,7 +49,7 @@ export async function billsSuite({ page, check, base }) {
     const s = (await getStore()).getState();
     return { ...version, notes: s.transactions.map((t) => t.note), categories: s.categories.length, bills: s.bills.length };
   })()`);
-  check('v1 database upgrades to the latest (v6): entries and categories kept, newer stores added', upgraded.v === 6 && upgraded.stores.includes('pending') && upgraded.stores.includes('bills') && upgraded.stores.includes('challenges') && upgraded.stores.includes('debts') && upgraded.stores.includes('goals') && upgraded.notes.includes('From version 1') && upgraded.categories === 21 && upgraded.bills === 0, JSON.stringify(upgraded));
+  check('v1 database upgrades to the latest (v7): entries and categories kept, newer stores added', upgraded.v === 7 && upgraded.stores.includes('pending') && upgraded.stores.includes('feedback') && upgraded.stores.includes('bills') && upgraded.stores.includes('challenges') && upgraded.stores.includes('debts') && upgraded.stores.includes('goals') && upgraded.notes.includes('From version 1') && upgraded.categories === 21 && upgraded.bills === 0, JSON.stringify(upgraded));
 
   // ── 2. Safe to Spend ──
   check('No pay yet → friendly prompt instead of a number', (await text('#safe-card'))?.includes('Add your pay'));
