@@ -57,5 +57,6 @@ test('service worker only handles its own origin and plain reads', () => {
   assert.match(sw, /request\.method !== 'GET'/);
   const install = sw.slice(sw.indexOf("addEventListener('install'"), sw.indexOf("addEventListener('activate'"));
   assert.ok(install.length > 0 && !install.includes('skipWaiting'), 'a new version must wait for the person to tap Update');
+  assert.match(sw, /event\.origin !== self\.location\.origin/, 'messages are accepted only from our own pages');
   assert.doesNotMatch(sw, /https?:\/\//, 'no external URLs');
 });

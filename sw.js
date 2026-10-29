@@ -63,8 +63,9 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-// The page sends this when the person taps "Update".
+// The page sends this when the person taps "Update". Only our own pages may ask.
 self.addEventListener('message', (event) => {
+  if (event.origin !== self.location.origin) return;
   if (event.data === 'skip-waiting') self.skipWaiting();
 });
 
