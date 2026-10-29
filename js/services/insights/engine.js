@@ -1,7 +1,7 @@
 // Smart Coach, levels 1–2 (INSIGHTS.md): turns your data into a few plain, sourced tips about
 // where to cut back, each with the money it could free up and a "Why?" that shows the math.
 // Pure functions; money is integer cents. Not financial advice, and the UI says so.
-import { monthKey, shiftMonth } from '../../utils/dates.js';
+import { monthKey, shiftMonth, addDays } from '../../utils/dates.js';
 import { inMonth, incomeForMonth } from './month.js';
 import { SPENDING_BENCHMARKS, INCOME_BENCHMARKS, CATEGORY_BENCHMARK, BLS_2024 } from './benchmarkData.js';
 
@@ -184,6 +184,142 @@ function paceTips({ transactions, categories, bills = [] }, today) {
   return tips;
 }
 
+// ── Level 2 patterns (E5-S2 to E5-S6): each compares you only with yourself ──
+
+const isEveryday = (c, billCategories) => c && c.type === 'expense' && c.bucket !== 'savings'
+  && !billCategories.has(c.id) && CATEGORY_BENCHMARK[c.benchmarkKey] !== 'housing' && c.benchmarkKey !== 'debt';
+const activeBillCategories = (bills = []) => new Set(bills.filter((b) => b.active).map((b) => b.categoryId));
+const categoryById = (categories) => new Map(categories.map((c) => [c.id, c]));
+
+// E5-S2: last (complete) month was well above your usual for a category.
+function higherThanUsualTips({ transactions, categories, bills }, today) {
+  const last = shiftMonth(monthKey(today), -1);
+  const billCats = activeBillCategories(bills);
+  const tips = [];
+  for (const c of categories) {
+    if (!isEveryday(c, billCats)) continue;
+    const spent = sum(inMonth(transactions, last).filter((t) => t.type === 'expense' && t.categoryId === c.id));
+    const usual = usualFor(transactions, c.id, last);
+    if (!spent || usual === null || spent < usual * PACE_MARGIN || spent - usual < MIN_MONTHLY_GAIN) continue;
+    tips.push({
+      id: `higher:${c.id}:${last}`, type: 'higher_than_usual', level: 2, key: c.id,
+      title: `${c.name} was higher than usual last month`,
+      message: `${c.name} was ${dollars(spent)} last month, ${dollars(spent - usual)} more than your usual ${dollars(usual)}.`,
+      estimatedMonthlySavingsCents: spent - usual, confidence: 0.5,
+      why: { lines: [[`${c.name}, last month`, spent], ['Your usual month (middle of the 3 before)', usual], ['Difference', spent - usual]], note: 'Usual = the middle value of your 3 months before, counting only months with spending.', source: 'Your own entries on this device' },
+    });
+  }
+  return tips;
+}
+
+// E5-S3: one charge much bigger than your usual for that category (last 14 days).
+function spikeTips({ transactions, categories, bills }, today) {
+  const billCats = activeBillCategories(bills);
+  const byId = categoryById(categories);
+  const since = addDays(today, -13);
+  const history = transactions.filter((t) => t.type === 'expense' && t.date >= addDays(today, -120) && t.date <= today);
+  const tips = [];
+  for (const t of history.filter((x) => x.date >= since)) {
+    const c = byId.get(t.categoryId);
+    if (!isEveryday(c, billCats)) continue;
+    const others = history.filter((x) => x.categoryId === t.categoryId && x.id !== t.id).map((x) => x.amountCents);
+    if (others.length < 5) continue;
+    const typical = median(others);
+    if (t.amountCents < Math.max(typical * 3, 5000)) continue;
+    tips.push({
+      id: `spike:${t.id}`, type: 'spike', level: 2, key: `spike:${t.id}`,
+      title: `A bigger ${c.name} charge than usual`,
+      message: `${dollars(t.amountCents)} for ${c.name}${t.note ? ` (${t.note})` : ''} on ${t.date.slice(5).replace('-', '/')} is much more than your usual ${dollars(typical)}. Was it planned? If not, it may be worth a second look.`,
+      estimatedMonthlySavingsCents: 0, confidence: 0, // informational: shown after the money-saving tips
+      why: { lines: [['This charge', t.amountCents], [`Your usual ${c.name} charge (last 4 months)`, typical], ['Times bigger', `${(t.amountCents / typical).toFixed(1)}×`]], note: 'Flagged when a charge is at least 3 times your usual one in that category, and at least $50.', source: 'Your own entries on this device' },
+    });
+  }
+  return tips;
+}
+
+// E5-S4: lots of small purchases that add up (last complete month).
+const SMALL = 1500; // under $15
+function smallStuffTips({ transactions, categories, bills }, today) {
+  const last = shiftMonth(monthKey(today), -1);
+  const billCats = activeBillCategories(bills);
+  const tips = [];
+  for (const c of categories) {
+    if (!isEveryday(c, billCats)) continue;
+    const small = inMonth(transactions, last).filter((t) => t.type === 'expense' && t.categoryId === c.id && t.amountCents < SMALL);
+    const total = sum(small);
+    if (small.length < 8 || total < 6000) continue;
+    const half = Math.round(total / 2);
+    tips.push({
+      id: `small:${c.id}:${last}`, type: 'small_stuff', level: 2, key: `small:${c.id}`,
+      title: 'Small purchases add up',
+      message: `${small.length} ${c.name} purchases under $15 came to ${dollars(total)} last month. That\u2019s about ${dollars(total * 12)} a year. Cutting them in half would save about ${dollars(half)} a month.`,
+      estimatedMonthlySavingsCents: half, confidence: 0.5,
+      why: { lines: [[`${c.name} purchases under $15, last month`, `${small.length}`], ['Together', total], ['Over a year at this rate', total * 12]], note: 'Small, frequent purchases are easy to miss and often the easiest to trim.', source: 'Your own entries on this device' },
+    });
+  }
+  return tips;
+}
+
+// E5-S5: the same charge (same category + note, within 5%) in 3 of the last 4 months: likely a subscription.
+function repeatingTips({ transactions, categories, bills = [] }, today) {
+  const month = monthKey(today);
+  const months = [0, 1, 2, 3].map((n) => shiftMonth(month, -n));
+  const byId = categoryById(categories);
+  const groups = new Map();
+  for (const t of transactions) {
+    if (t.type !== 'expense' || !months.includes(monthKey(t.date)) || t.date > today) continue;
+    const key = `${t.categoryId}|${(t.note ?? '').trim().toLowerCase()}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+  const tips = [];
+  for (const list of groups.values()) {
+    const amounts = list.map((t) => t.amountCents);
+    const typical = median(amounts);
+    const steady = list.filter((t) => Math.abs(t.amountCents - typical) <= typical * 0.05);
+    const inMonths = new Set(steady.map((t) => monthKey(t.date)));
+    if (inMonths.size < 3 || steady.length > inMonths.size + 1 || typical < 300) continue; // ~monthly, $3+
+    const c = byId.get(list[0].categoryId);
+    if (!c || c.bucket === 'savings' || c.bucket === 'need') continue; // wants: subscriptions, memberships…
+    // Already tracked as a bill? Then the person knows about it.
+    if (bills.some((b) => b.active && b.categoryId === c.id && Math.abs(b.amountCents - typical) <= typical * 0.1)) continue;
+    const name = (list[0].note ?? '').trim() || c.name;
+    tips.push({
+      id: `repeat:${c.id}:${name.toLowerCase()}`, type: 'repeating', level: 2, key: `repeat:${c.id}:${name.toLowerCase()}`,
+      title: `${name}: about ${dollars(typical)} every month`,
+      message: `You\u2019ve paid about ${dollars(typical)} for ${name} in ${inMonths.size} of the last 4 months. That\u2019s about ${dollars(typical * 12)} a year. Still using it? If yes, adding it as a bill keeps Safe to Spend accurate.`,
+      estimatedMonthlySavingsCents: typical, confidence: 0.4,
+      why: { lines: [['Typical charge', typical], ['Months seen (of the last 4)', `${inMonths.size}`], ['Per year', typical * 12]], note: 'Same category and note, within 5% of the same amount, about once a month.', source: 'Your own entries on this device' },
+    });
+  }
+  return tips;
+}
+
+// E5-S6: your best recent month for a "want" is a realistic target.
+function bestMonthTips({ transactions, categories, bills }, today) {
+  const month = monthKey(today);
+  const billCats = activeBillCategories(bills);
+  const tips = [];
+  for (const c of categories) {
+    if (!isEveryday(c, billCats) || c.bucket !== 'want') continue;
+    const past = [1, 2, 3, 4, 5, 6].map((n) => shiftMonth(month, -n))
+      .filter((m) => inMonth(transactions, m).some((t) => t.type === 'expense'))
+      .map((m) => sum(inMonth(transactions, m).filter((t) => t.type === 'expense' && t.categoryId === c.id)));
+    if (past.length < 3) continue;
+    const usual = median(past);
+    const best = Math.min(...past.filter((v) => v > 0));
+    if (!Number.isFinite(best) || usual - best < 4000) continue;
+    tips.push({
+      id: `best:${c.id}:${month}`, type: 'best_month', level: 2, key: c.id,
+      title: `You\u2019ve done ${c.name} for less before`,
+      message: `Your lowest ${c.name} month recently was ${dollars(best)}, against a usual ${dollars(usual)}. Matching it would free up about ${dollars(usual - best)} a month.`,
+      estimatedMonthlySavingsCents: usual - best, confidence: 0.4,
+      why: { lines: [[`Your lowest ${c.name} month (last 6)`, best], ['Your usual month', usual], ['Difference', usual - best]], note: 'Based only on months where you recorded spending.', source: 'Your own entries on this device' },
+    });
+  }
+  return tips;
+}
+
 function dollars(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Math.round(cents / 100));
 }
@@ -199,12 +335,17 @@ export function coachStatus(state, today) {
 
 // All tips, most valuable first. Score = monthly money freed × confidence.
 export function coachTips(state, today) {
-  const tips = [...paceTips(state, today), ...mixTips(state, today), ...housingTip(state, today)]
+  const tips = [
+    ...paceTips(state, today), ...mixTips(state, today), ...housingTip(state, today),
+    ...higherThanUsualTips(state, today), ...bestMonthTips(state, today), ...smallStuffTips(state, today),
+    ...repeatingTips(state, today), ...spikeTips(state, today),
+  ]
     .map((t) => ({ ...t, score: Math.round(t.estimatedMonthlySavingsCents * t.confidence) }));
   // One tip per topic: if dining out is both "above typical" and "running ahead", keep the stronger one.
   const seen = new Set();
   return tips.sort((a, b) => b.score - a.score).filter((t) => {
-    const topic = t.type === 'pace' ? CATEGORY_BENCHMARK[state.categories.find((c) => c.id === t.key)?.benchmarkKey] ?? t.key : t.key;
+    const perCategory = ['pace', 'higher_than_usual', 'best_month'].includes(t.type);
+    const topic = perCategory ? CATEGORY_BENCHMARK[state.categories.find((c) => c.id === t.key)?.benchmarkKey] ?? t.key : t.key;
     if (seen.has(topic)) return false;
     seen.add(topic);
     return true;
