@@ -55,7 +55,7 @@ function render(target, state) {
     return;
   }
   const seeAll = el('a', { class: 'btn btn-quiet', href: '#/history', id: 'see-all' }, `See all ${entries.length} in History ›`);
-  seeAll.addEventListener('click', () => showHistoryMonth(month));
+  seeAll.addEventListener('click', () => showHistoryMonth(month, { clearSearch: true }));
   target.append(el('section', { class: 'section', 'aria-labelledby': 'recent-title' },
     el('h2', { class: 'section-title', id: 'recent-title' }, 'Recent'),
     el('ul', { class: 'list' }, entries.slice(0, 5).map((t) => recentRow(t, byId.get(t.categoryId)))),
