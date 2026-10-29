@@ -128,7 +128,8 @@
   cursor: pointer;
 }
 
-.choice span {
+/* Only the chip itself (direct child), not spans inside it like an icon. */
+.choice > span {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -257,4 +258,72 @@
 .card .list-row:last-child {
   border-bottom: 0;
   padding-bottom: 0;
+}
+
+/* ── Money input with a "$" in front ── */
+.money-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-money);
+  font-size: var(--text-xl);
+}
+
+/* ── Toast: one short message above the tab bar ── */
+.toast-region {
+  position: fixed;
+  inset: auto var(--space-4) calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--space-3)) var(--space-4);
+  z-index: var(--z-skip-link);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: var(--content-width);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  background: var(--text);
+  color: var(--bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  pointer-events: auto;
+}
+
+.toast-message {
+  min-width: 0;
+}
+
+.toast .toast-action {
+  color: var(--bg);
+  text-decoration: underline;
+}
+
+.toast .toast-action:hover {
+  background: transparent;
+  color: var(--bg);
+}
+
+/* ── Category chips: a grid, so many categories fit above the Save button ── */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+}
+
+.category-grid legend {
+  grid-column: 1 / -1;
+}
+
+.category-grid .choice > span {
+  width: 100%;
+  border-radius: var(--radius-md);
+  padding-inline: var(--space-3);
+}
+
+.category-grid .field-error {
+  grid-column: 1 / -1;
 }
