@@ -97,9 +97,14 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500), pr
     },
     async reload() { await load(() => send('Page.reload')); },
     async key(key, code, keyCode) {
-      for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: keyCode });
+      // A real Enter key also types "\r"; browsers need it to submit a form from a text field.
+      const text = key === 'Enter' ? '\r' : undefined;
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, text });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
       await sleep(100);
     },
+    // Types text into the focused field, like a keyboard would.
+    async type(text) { await send('Input.insertText', { text }); await sleep(50); },
     colorScheme: (value) => send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value }] }),
     async close() {
       ws.close();

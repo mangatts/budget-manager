@@ -23,7 +23,9 @@ export async function shellSuite({ page, check, base }) {
     await page.eval(`document.querySelector('nav a[data-route="${route}"]').click()`);
     await page.sleep(150);
     s = await state(page);
-    check(`Tap "${route}" → screen, URL, aria-current, title, focus`, s.hash === `#/${route}` && s.h1.toLowerCase() === route && s.current.join() === route && s.title === `${s.h1} · Budget Manager` && s.focused === 'H1');
+    // Focus moves to the new heading, except on Add, where it goes to Amount so the keypad opens.
+    const expectedFocus = route === 'add' ? 'INPUT.input input-money' : 'H1';
+    check(`Tap "${route}" → screen, URL, aria-current, title, focus`, s.hash === `#/${route}` && s.h1.toLowerCase() === route && s.current.join() === route && s.title === `${s.h1} · Budget Manager` && s.focused === expectedFocus, s.focused);
   }
 
   await page.eval('history.back()'); await page.sleep(250);
@@ -39,12 +41,12 @@ export async function shellSuite({ page, check, base }) {
   check('Markup in the URL is never rendered', (await state(page)).h1 === 'Home' && !(await page.eval(`!!document.querySelector('main img')`)));
 
   // Keyboard, from a fresh load
-  await page.goto(`${base}#/add`); await page.reload();
+  await page.goto(`${base}#/tips`); await page.reload();
   await page.key('Tab', 'Tab', 9);
   check('First Tab focuses "Skip to content"', (await state(page)).focused.includes('skip-link'));
   await page.key('Enter', 'Enter', 13);
   s = await state(page);
-  check('Skip link → focus main, URL unchanged', s.focused.startsWith('MAIN') && s.hash === '#/add');
+  check('Skip link → focus main, URL unchanged', s.focused.startsWith('MAIN') && s.hash === '#/tips');
   for (let i = 0; i < 3; i++) await page.key('Tab', 'Tab', 9);
   await page.key('Enter', 'Enter', 13);
   check('Tab to "History" + Enter navigates', (await state(page)).hash === '#/history');

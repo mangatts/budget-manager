@@ -5,12 +5,15 @@ import { launch, newProfile } from './browser.mjs';
 import { shellSuite } from './shell.e2e.mjs';
 import { displaySuite } from './display.e2e.mjs';
 import { dataSuite } from './data.e2e.mjs';
+import { addSuite } from './add.e2e.mjs';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5500/';
-const suites = [['App shell', shellSuite], ['Display settings', displaySuite], ['On-device data', dataSuite]];
+const suites = [['App shell', shellSuite], ['Display settings', displaySuite], ['On-device data', dataSuite], ['Add screen', addSuite]];
 
+// E2E_ONLY="Add screen" runs one suite while developing; CI always runs them all.
+const only = process.env.E2E_ONLY;
 let failed = 0;
-for (const [name, suite] of suites) {
+for (const [name, suite] of suites.filter(([n]) => !only || n === only)) {
   const page = await launch();
   const results = [];
   const check = (label, ok, detail = '') => {
