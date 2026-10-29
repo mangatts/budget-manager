@@ -61,7 +61,9 @@ export async function launch({ port = 9400 + Math.floor(Math.random() * 500), pr
   // Every command times out with a clear message, so a stuck call can't hang CI.
   const send = (method, params = {}, timeoutMs = 15000) => new Promise((resolve, reject) => {
     const id = ++nextId;
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out after ${timeoutMs}ms`)); }, timeoutMs);
+    // Say which step stalled, so an intermittent timeout can be traced.
+    const what = params.expression ? ` (${params.expression.replace(/\s+/g, ' ').slice(0, 90)})` : params.url ? ` (${params.url})` : '';
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out after ${timeoutMs}ms${what}`)); }, timeoutMs);
     pending.set(id, { resolve, reject, timer, method });
     ws.send(JSON.stringify({ id, method, params }));
   });
