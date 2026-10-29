@@ -2,7 +2,8 @@ import { createRouter } from './router.js';
 import { placeholderView } from './views/placeholder.js';
 import { moreView } from './views/more.js';
 import { homeView } from './views/home.js';
-import { addView } from './views/add.js';
+import { addView, editView } from './views/add.js';
+import { historyView } from './views/history.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
 import { initToasts } from './ui/toast.js';
@@ -13,7 +14,8 @@ const APP_NAME = 'Budget Manager';
 const routes = {
   home: { title: 'Home', view: homeView },
   add: { title: 'Add', view: addView },
-  history: { title: 'History', view: () => placeholderView('History', 'See and edit past entries. Coming in Sprint 1.') },
+  history: { title: 'History', view: historyView },
+  edit: { title: 'Edit', view: editView, tab: 'history' }, // #/edit/<id>, not in the tab bar
   tips: { title: 'Tips', view: () => placeholderView('Tips', 'Smart Coach tips on where to cut back. Coming in Sprint 4.') },
   more: { title: 'More', view: moreView },
   design: { title: 'Design reference', view: designView }, // not in the tab bar
