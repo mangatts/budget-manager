@@ -6,10 +6,14 @@ import { getStore } from '../appStore.js';
 import { coachTips, coachStatus, MIN_DAY_FIRST_MONTH } from '../services/insights/engine.js';
 import { tipCard, disclaimer } from '../ui/tipCard.js';
 import { categoryChart } from '../ui/categoryChart.js';
+import { cutPlanSection } from '../ui/cutPlan.js';
 
-function render(body, state) {
+function render(body, store) {
+  const state = store.getState();
   clear(body);
   const today = todayLocal();
+  const plan = cutPlanSection(store, today);
+  if (plan) body.append(plan);
   body.append(categoryChart(state, monthKey(today)));
   const { tips, reason } = coachStatus(state, today);
   if (!tips.length) {
@@ -35,8 +39,8 @@ function render(body, state) {
 export function tipsView() {
   const body = el('div', { class: 'section' }, el('p', { class: 'lead' }, 'Loading…'));
   getStore().then((store) => {
-    render(body, store.getState());
-    const stop = store.subscribe(() => { if (!body.isConnected) return stop(); render(body, store.getState()); });
+    render(body, store);
+    const stop = store.subscribe(() => { if (!body.isConnected) return stop(); render(body, store); });
   }, () => { clear(body); body.append(el('p', { class: 'field-error', role: 'alert' }, 'This browser can’t save data on this device.')); });
   return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Tips'), body);
 }
