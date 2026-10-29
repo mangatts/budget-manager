@@ -8,6 +8,7 @@ import { categoriesView, categoryView } from './views/categories.js';
 import { wipeView } from './views/wipe.js';
 import { profileView } from './views/profile.js';
 import { billsView, billView } from './views/bills.js';
+import { debtsView, debtView } from './views/debts.js';
 import { tipsView } from './views/tips.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
@@ -31,6 +32,8 @@ const routes = {
   profile: { title: 'Your money', view: profileView, tab: 'more' },
   bills: { title: 'Bills', view: billsView, tab: 'more' },
   bill: { title: 'Bill', view: billView, tab: 'more' }, // #/bill/<id> or #/bill/new
+  debts: { title: 'Debts', view: debtsView, tab: 'more' },
+  debt: { title: 'Debt', view: debtView, tab: 'more' }, // #/debt/<id> or #/debt/new
   design: { title: 'Design reference', view: designView }, // not in the tab bar
 };
 
