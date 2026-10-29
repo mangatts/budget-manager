@@ -69,10 +69,22 @@ export async function pwaSuite({ page, check, base }) {
     const swPath = join(site, 'sw.js');
     writeFileSync(swPath, readFileSync(swPath, 'utf8').replace(/const VERSION = '(\w+)'/, "const VERSION = '$1-next'"));
     const oldCache = await page.eval(`caches.keys().then((k) => k.join())`);
-    await page.eval(`navigator.serviceWorker.getRegistration().then((r) => r.update())`);
+    // Ask the browser to check for updates, retrying: a check already running from the page load
+    // may still have the old file, and the browser merges our request into it.
     let offered = false;
-    for (let i = 0; i < 40 && !offered; i++) { await page.sleep(150); offered = (await page.eval(`document.querySelector('.toast-message')?.textContent ?? ''`)) === 'New version ready'; }
-    check('New version → "New version ready · Update" (not switched yet)', offered && !(await page.eval(`caches.keys().then((k) => k.some((n) => n.endsWith('-next')) && navigator.serviceWorker.controller.state === 'activated' && false)`)));
+    for (let i = 0; i < 100 && !offered; i++) {
+      if (i % 10 === 0) await page.eval(`navigator.serviceWorker.getRegistration().then((r) => r.update()).catch(() => {})`);
+      await page.sleep(150);
+      offered = (await page.eval(`document.querySelector('.toast-message')?.textContent ?? ''`)) === 'New version ready';
+    }
+    const swState = await page.eval(`navigator.serviceWorker.getRegistration().then(async (r) => JSON.stringify({ installing: r.installing?.state, waiting: r.waiting?.state, active: r.active?.state, controlled: !!navigator.serviceWorker.controller, caches: await caches.keys(), toast: document.querySelector('.toast-region')?.textContent }))`);
+    check('New version → "New version ready · Update" (not switched yet)', offered, swState);
+    // Another message (e.g. "Added …") must not make the update prompt disappear for good.
+    await page.eval(`import(new URL('js/ui/toast.js', location.href)).then((t) => t.showToast({ message: 'Added \u2212$1.00 · Gas', duration: 300 }))`);
+    await page.sleep(100);
+    const replaced = await page.eval(`document.querySelector('.toast-message')?.textContent`);
+    await page.sleep(500);
+    check('The update prompt comes back after another message', replaced.startsWith('Added') && (await page.eval(`document.querySelector('.toast-message')?.textContent`)) === 'New version ready');
     await page.eval(`document.querySelector('.toast-action').click()`);
     let switched = false;
     for (let i = 0; i < 40 && !switched; i++) { await page.sleep(200); try { switched = await page.eval(`caches.keys().then((k) => k.length === 1 && k[0].endsWith('-next'))`); } catch { /* reloading */ } }

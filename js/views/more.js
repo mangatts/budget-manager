@@ -13,14 +13,18 @@ const COMING_SOON = [
 
 function installSection() {
   const body = el('div', { class: 'section', id: 'install-body' });
-  const render = () => {
+  // `result` overrides the browser check right after the install prompt: a normal tab still
+  // reports "not standalone" after installing, so trust what the person chose.
+  const render = (result = null) => {
     clear(body);
-    const state = installState();
-    if (state === 'installed') {
+    const state = result === 'accepted' ? 'installed' : installState();
+    if (result === 'dismissed') {
+      body.append(el('p', { class: 'lead' }, 'No problem. You can install it any time from your browser\u2019s menu (\u201cInstall\u201d or \u201cAdd to Home Screen\u201d).'));
+    } else if (state === 'installed') {
       body.append(el('p', {}, el('span', { class: 'pill pill-good' }, '\u2713 Installed'), ' You\u2019re using the app version.'));
     } else if (state === 'prompt') {
       const button = el('button', { class: 'btn btn-primary', type: 'button', id: 'install-button' }, 'Install Budget Manager');
-      button.addEventListener('click', async () => { await promptInstall(); render(); });
+      button.addEventListener('click', async () => render((await promptInstall()) ? 'accepted' : 'dismissed'));
       body.append(el('p', { class: 'lead' }, 'Open it from your home screen like any app. It works without internet, and it protects your data from automatic cleanup.'), button);
     } else if (state === 'ios') {
       body.append(

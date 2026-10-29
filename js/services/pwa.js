@@ -36,15 +36,20 @@ export function registerServiceWorker({ onUpdateReady }) {
     },
   });
 
+  // "installed" with an existing controller = an update waiting (not the very first install).
+  // Checks a worker's current state as well as future changes, so an update that started
+  // while the app was still loading isn't missed.
+  const track = (worker) => {
+    if (!worker) return;
+    const check = () => { if (worker.state === 'installed' && navigator.serviceWorker.controller) offer(worker); };
+    check();
+    worker.addEventListener('statechange', check);
+  };
+
   navigator.serviceWorker.register(policy ? policy.createScriptURL(SW_URL) : SW_URL).then((registration) => {
-    if (registration.waiting && navigator.serviceWorker.controller) offer(registration.waiting);
-    registration.addEventListener('updatefound', () => {
-      const worker = registration.installing;
-      worker?.addEventListener('statechange', () => {
-        // "installed" with an existing controller = an update (not the very first install).
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) offer(worker);
-      });
-    });
+    track(registration.waiting);
+    track(registration.installing);
+    registration.addEventListener('updatefound', () => track(registration.installing));
   }).catch(() => { /* offline support unavailable; the app still works online */ });
 
   // Reload once the new version takes over, but only when the person asked for it.

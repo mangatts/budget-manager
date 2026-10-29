@@ -6,7 +6,7 @@ import { addView, editView } from './views/add.js';
 import { historyView } from './views/history.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
-import { initToasts, showToast } from './ui/toast.js';
+import { initToasts, setStickyToast } from './ui/toast.js';
 import { registerServiceWorker, requestPersistence } from './services/pwa.js';
 
 const APP_NAME = 'Budget Manager';
@@ -49,5 +49,6 @@ getStore().then((store) => {
 
 // Offline support. A new version waits until the person chooses to update.
 registerServiceWorker({
-  onUpdateReady: (apply) => showToast({ message: 'New version ready', action: { label: 'Update', run: () => { apply(); return 'Updating\u2026'; } }, duration: null }),
+  // Sticky: if a "Saved" message replaces it, it comes back afterwards.
+  onUpdateReady: (apply) => setStickyToast({ message: 'New version ready', action: { label: 'Update', run: () => { apply(); return 'Updating\u2026'; } } }),
 });
