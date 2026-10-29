@@ -95,8 +95,11 @@ export const INCOME_BENCHMARKS = Object.freeze({
 });
 
 // Which spending benchmark each default category's benchmarkKey maps to.
+// "Shopping" (apparel_misc) is deliberately NOT mapped: it mixes clothing, household goods, electronics
+// and more, and no single BLS line matches it. Comparing it to clothing alone would overstate the gap.
+// It still gets "running ahead of your usual" tips, which compare you only with yourself.
 export const CATEGORY_BENCHMARK = Object.freeze({
   housing: 'housing', utilities: 'housing', transportation: 'transportation',
   food_home: 'food_home', food_away: 'food_away', healthcare: 'healthcare',
-  entertainment: 'entertainment', apparel_misc: 'apparel', personal_care: 'personal_care', gifts: 'cash_contributions',
+  entertainment: 'entertainment', personal_care: 'personal_care', gifts: 'cash_contributions',
 });
