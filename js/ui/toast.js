@@ -20,7 +20,7 @@ export function hideToast() {
   if (region) clear(region);
 }
 
-// showToast({ message, action: { label, run } }) — run() may be async.
+// showToast({ message, action: { label, run } }) — run() may be async. duration: null keeps it until replaced.
 export function showToast({ message, action, duration = 6000 }) {
   const target = initToasts();
   hideToast();
@@ -37,5 +37,5 @@ export function showToast({ message, action, duration = 6000 }) {
       }
     });
   }
-  timer = setTimeout(hideToast, duration);
+  if (duration) timer = setTimeout(hideToast, duration);
 }
