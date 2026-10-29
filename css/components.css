@@ -643,3 +643,34 @@ select.input {
 .tip h3 {
   font-size: var(--text-lg);
 }
+
+/* ── Where your money went: single-series horizontal bars ── */
+.cat-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.cat-track {
+  display: block;
+  height: 0.75rem;
+  max-height: 24px;
+}
+
+.cat-bar {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+
+.cat-value {
+  font-weight: var(--weight-bold);
+}
+
+.cat-row:hover .meter-tip,
+.cat-row:focus-visible .meter-tip {
+  opacity: 1;
+}

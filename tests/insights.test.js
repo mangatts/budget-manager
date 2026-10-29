@@ -70,3 +70,15 @@ test('50/30/20 adds up, and every default benchmark key has a mapping or is inte
   for (const target of Object.values(CATEGORY_BENCHMARK)) assert.ok(target in SPENDING_BENCHMARKS, target);
   assert.equal(CATEGORY_BENCHMARK.apparel_misc, undefined);
 });
+
+test('spending by category: biggest first, top 6 + "Everything else", shares add to 1', async () => {
+  const { spendingByCategory } = await import('../js/services/insights/month.js');
+  const ids = ['c-housing', 'c-groceries', 'c-dining', 'c-gas', 'c-shopping', 'c-utilities', 'c-gifts', 'c-health'];
+  const transactions = ids.map((id, i) => ({ date: '2026-10-05', type: 'expense', amountCents: (8 - i) * 1000, categoryId: id }));
+  transactions.push({ date: '2026-10-06', type: 'income', amountCents: 999999, categoryId: 'c-paycheck' }, { date: '2026-09-06', type: 'expense', amountCents: 999999, categoryId: 'c-dining' });
+  const { totalCents, rows } = spendingByCategory({ transactions, categories: DEFAULT_CATEGORIES }, '2026-10');
+  assert.equal(totalCents, 36000);
+  assert.deepEqual(rows.map((r) => [r.name, r.cents]), [['Housing', 8000], ['Groceries', 7000], ['Dining Out', 6000], ['Gas', 5000], ['Shopping', 4000], ['Utilities', 3000], ['Everything else (2)', 3000]]);
+  assert.ok(Math.abs(rows.reduce((s, r) => s + r.share, 0) - 1) < 1e-9);
+  assert.deepEqual(spendingByCategory({ transactions: [], categories: DEFAULT_CATEGORIES }, '2026-10'), { totalCents: 0, rows: [] });
+});

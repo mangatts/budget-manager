@@ -41,3 +41,20 @@ export function incomeForMonth(state, month) {
   if (expected && expected.cents > recordedCents) return { cents: expected.cents, source: expected.estimated ? 'estimated' : 'take-home', recordedCents };
   return recordedCents > 0 ? { cents: recordedCents, source: 'recorded', recordedCents } : null;
 }
+
+// Money out by category for a month, biggest first: the top `top` plus "Everything else". Pure.
+export function spendingByCategory({ transactions, categories }, month, top = 6) {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const totals = new Map();
+  for (const t of inMonth(transactions, month)) {
+    if (t.type !== 'expense') continue;
+    totals.set(t.categoryId, (totals.get(t.categoryId) ?? 0) + t.amountCents);
+  }
+  const totalCents = [...totals.values()].reduce((s, c) => s + c, 0);
+  const rows = [...totals].map(([id, cents]) => ({ id, name: byId.get(id)?.name ?? 'Unknown', icon: byId.get(id)?.icon ?? '•', cents }))
+    .sort((a, b) => b.cents - a.cents || a.name.localeCompare(b.name));
+  const shown = rows.slice(0, top);
+  const rest = rows.slice(top);
+  if (rest.length) shown.push({ id: 'other', name: `Everything else (${rest.length})`, icon: '…', cents: rest.reduce((s, r) => s + r.cents, 0) });
+  return { totalCents, rows: shown.map((r) => ({ ...r, share: totalCents ? r.cents / totalCents : 0 })) };
+}
