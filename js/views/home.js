@@ -6,6 +6,9 @@ import { getStore } from '../appStore.js';
 import { backupReminder } from '../ui/backupReminder.js';
 import { showHistoryMonth } from './history.js';
 import { inMonth, monthSummary } from '../services/insights/month.js';
+import { upcomingBills } from '../services/insights/safeToSpend.js';
+import { safeToSpendCard } from '../ui/safeToSpendCard.js';
+import { billStatusPill } from './bills.js';
 
 // Remembered while the app is open.
 let month = null;
@@ -63,16 +66,40 @@ function render(target, state) {
   ));
 }
 
+function upcomingSection(state, today) {
+  const upcoming = upcomingBills(state.bills, state.transactions, today);
+  if (!upcoming.length) return null;
+  return el('section', { class: 'section', 'aria-labelledby': 'upcoming-title', id: 'upcoming' },
+    el('h2', { class: 'section-title', id: 'upcoming-title' }, 'Bills coming up'),
+    el('ul', { class: 'list' }, upcoming.map((u) => el('li', {},
+      el('a', { class: 'list-row list-row-link', href: `#/bill/${u.bill.id}` },
+        el('span', { class: 'list-row-main' }, el('span', {}, u.bill.name), billStatusPill(u, today)),
+        el('span', { class: 'money money-out' }, formatCents(-u.bill.amountCents)),
+      ),
+    ))),
+  );
+}
+
 export function homeView() {
   month ??= monthKey(todayLocal());
   const reminderSlot = el('div', { hidden: true }); // takes no space unless there's a reminder
+  const todaySlot = el('div', { class: 'section', id: 'today' });
   const body = el('div', { class: 'section', 'aria-live': 'polite' }, el('p', { class: 'lead' }, 'Loading…'));
   const label = el('h2', { class: 'month-label', id: 'month-label' }, formatMonth(month));
   const prev = el('button', { class: 'btn btn-secondary', type: 'button', id: 'home-prev', 'aria-label': 'Previous month' }, '‹');
   const next = el('button', { class: 'btn btn-secondary', type: 'button', id: 'home-next', 'aria-label': 'Next month' }, '›');
 
   getStore().then((store) => {
-    const refresh = () => { label.textContent = formatMonth(month); render(body, store.getState()); };
+    const refresh = () => {
+      const state = store.getState();
+      const today = todayLocal();
+      clear(todaySlot);
+      todaySlot.append(safeToSpendCard(state, today));
+      const upcoming = upcomingSection(state, today);
+      if (upcoming) todaySlot.append(upcoming);
+      label.textContent = formatMonth(month);
+      render(body, state);
+    };
     prev.addEventListener('click', () => { month = shiftMonth(month, -1); refresh(); });
     next.addEventListener('click', () => { month = shiftMonth(month, 1); refresh(); });
     const reminder = backupReminder(store.getState());
@@ -87,6 +114,7 @@ export function homeView() {
   return el('div', { class: 'screen' },
     el('h1', { tabindex: '-1' }, 'Home'),
     reminderSlot,
+    todaySlot,
     el('div', { class: 'month-switcher' }, prev, label, next),
     body,
     el('a', { class: 'btn btn-primary btn-block', href: '#/add' }, '＋ Add money in or out'),

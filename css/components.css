@@ -199,7 +199,10 @@
 .money-out { color: var(--text); }
 
 .money-hero {
-  font-size: var(--text-hero);
+  /* Big, but never wider than a phone screen (even at Extra large text). */
+  font-size: min(var(--text-hero), 12vw);
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-weight: var(--weight-bold);
   line-height: 1;
 }
@@ -476,4 +479,51 @@
   font-weight: var(--weight-bold);
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+/* ── Safe to spend ── */
+.safe-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.why summary {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.math {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.math-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.math-line > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.math-total {
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--border);
+  font-weight: var(--weight-bold);
+}
+
+select.input {
+  appearance: auto;
 }

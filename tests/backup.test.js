@@ -31,7 +31,7 @@ test('full round trip: backup file → open → same data, ready to restore', as
   assert.equal(result.ok, true);
   assert.deepEqual(result.data.transactions, [tx()]);
   assert.equal(result.data.categories.length, 21);
-  assert.deepEqual(result.summary, { entries: 1, firstDate: '2026-10-28', lastDate: '2026-10-28', exportedAt: 1761650000000 });
+  assert.deepEqual(result.summary, { entries: 1, bills: 0, firstDate: '2026-10-28', lastDate: '2026-10-28', exportedAt: 1761650000000 });
   // After restoring, defaults aren't re-added, and the backup counts as the last backup.
   assert.deepEqual(result.data.meta, [{ key: 'seededCategories', value: 1 }, { key: 'lastBackupAt', value: 1761650000000 }]);
 });
@@ -111,4 +111,32 @@ test('profile settings travel in backups; bad values are dropped', async () => {
   bad.meta.push({ key: 'savingsPercent', value: 99 }, { key: 'monthlyTakeHomeCents', value: -5 }, { key: 'evil', value: 1 });
   const dropped = validatePayload(buildPayload(bad, 9)).data.meta.map((m) => m.key);
   assert.deepEqual(dropped.sort(), ['lastBackupAt', 'seededCategories']);
+});
+
+const bill = (over = {}) => ({ id: 'b1b2c3d4-0000-4000-8000-000000000001', name: 'Rent', amountCents: 140000, categoryId: 'c-housing', dayOfMonth: 1, active: true, createdAt: 5, updatedAt: 5, ...over });
+
+test('bills travel in backups (version 2)', async () => {
+  const s = { ...state(), bills: [bill()] };
+  const text = await createBackupFile(s, PASS, 7);
+  const result = await openBackupFile(text, PASS);
+  assert.deepEqual(result.data.bills, [bill()]);
+  assert.equal(result.summary.bills, 1);
+});
+
+test('older (version 1) backups, made before bills existed, still restore', async () => {
+  const v1 = { ...buildPayload(state(), 9), schemaVersion: 1 };
+  delete v1.data.bills;
+  const result = validatePayload(v1);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data.bills, []);
+});
+
+test('one bad bill rejects the whole backup', async () => {
+  for (const bad of [bill({ id: 'x' }), bill({ amountCents: 0 }), bill({ categoryId: 'c-paycheck' }), bill({ dayOfMonth: 32 }), bill({ name: '' }), bill({ active: 'yes' })]) {
+    const result = validatePayload(buildPayload({ ...state(), bills: [bad] }, 9));
+    assert.match(result.error, /bill that isn’t valid/, JSON.stringify(bad));
+  }
+  const missing = buildPayload(state(), 9);
+  missing.data.bills = 'nope';
+  assert.match(validatePayload(missing).error, /damaged/);
 });

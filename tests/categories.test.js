@@ -82,7 +82,7 @@ test('undo of an add is refused once an entry uses the new category (no orphaned
   const { store, repo } = await setup();
   const added = await store.addCategory(pets);
   await store.addTransaction({ type: 'expense', amount: '5', categoryId: added.record.id, date: '2026-10-28' });
-  await assert.rejects(added.undo(), (e) => /Entries now use Pets/.test(e.userMessage));
+  await assert.rejects(added.undo(), (e) => /Entries or bills now use Pets/.test(e.userMessage));
   assert.ok(await repo.get('categories', added.record.id));
 });
 
@@ -104,4 +104,17 @@ test('a failed undo throws instead of pretending it worked', async () => {
   adapter.putMany = async () => { throw new Error('quota'); };
   await assert.rejects(hidden.undo(), (e) => /Couldn’t save/.test(e.userMessage));
   assert.equal(store.getState().categories.find((c) => c.id === 'c-gifts').archived, true);
+});
+
+test('a category used only by a bill can’t be deleted or switch to money in (backups stay restorable)', async () => {
+  const { store } = await setup();
+  const added = await store.addCategory(pets);
+  await store.addBill({ name: 'Vet plan', amount: '30', categoryId: added.record.id, dayOfMonth: 5 });
+  const del = await store.deleteCategory(added.record.id);
+  assert.equal(del.ok, false);
+  assert.match(del.errors.form, /Entries or bills use this category/);
+  const switched = await store.updateCategory(added.record.id, { ...pets, type: 'income' });
+  assert.equal(switched.record.type, 'expense');
+  await assert.rejects(added.undo(), (e) => /Entries or bills now use Pets/.test(e.userMessage));
+  assert.equal(store.billsUsing(added.record.id), 1);
 });

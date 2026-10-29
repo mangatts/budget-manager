@@ -14,6 +14,10 @@ export const MIGRATIONS = [
     db.createObjectStore('categories', { keyPath: 'id' });
     db.createObjectStore('meta', { keyPath: 'key' });
   },
+  // v2: recurring bills (Sprint 3)
+  (db) => {
+    db.createObjectStore('bills', { keyPath: 'id' });
+  },
 ];
 
 const request = (req) => new Promise((resolve, reject) => {

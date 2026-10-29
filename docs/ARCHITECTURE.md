@@ -178,9 +178,17 @@ All money is stored as **integer cents** (`1250` = $12.50).
 { key: "textSize",      value: "normal" | "large" | "extra-large" }
 ```
 
+// bills (database v2): recurring bills for Safe to Spend
+{ id: "uuid", name: "Rent", amountCents: 140000, categoryId: "c-housing",
+  dayOfMonth: 1,            // 1–31; the 31st falls on the last day of shorter months
+  active: true, createdAt, updatedAt }
+// A bill counts as paid this month when an entry in its category is within ±10% of its amount.
+```
+
+```
 **Removed:** the `budgets` store (no expected-vs-actual).
 
-**Object stores:** `transactions` (indexes: `date`, `categoryId`, `fingerprint`), `categories`, `profile`, `insightFeedback` (index: `month`), `learnerState`, `merchantRules`, `imports`, `pendingTransactions` (index: `importId`), `meta`.
+**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**. Planned: `insightFeedback`, `learnerState`, `merchantRules`, `imports`, `pendingTransactions`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
 
 ---
 
@@ -209,7 +217,7 @@ budget-manager/
 │   │   ├── indexeddb.js    # versioned migrations; never edit a released one
 │   │   └── memory.js       # same interface, for unit tests
 │   ├── services/
-│   │   ├── insights/
+│   │   ├── insights/       # benchmarkData.js, month.js, safeToSpend.js (built); tips later
 │   │   │   ├── benchmarks.js
 │   │   │   ├── benchmarkData.js   # the numbers + sources
 │   │   │   ├── patterns.js

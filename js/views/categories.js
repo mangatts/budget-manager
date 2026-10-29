@@ -54,6 +54,8 @@ export function categoriesView() {
 function categoryForm(store, category) {
   const editing = Boolean(category);
   const uses = editing ? store.usedBy(category.id) : 0;
+  const bills = editing ? store.billsUsing(category.id) : 0;
+  const locked = uses + bills > 0; // can't delete or switch money in/out
   let type = category?.type ?? 'expense';
   let bucket = category?.bucket ?? 'want';
   let icon = category?.icon ?? CATEGORY_ICONS[0];
@@ -82,13 +84,14 @@ function categoryForm(store, category) {
   };
   showBucket();
 
-  const typeControl = editing && uses
-    ? el('p', { class: 'field-hint' }, `${type === 'income' ? 'Money in' : 'Money out'} · can’t change because ${uses} ${uses === 1 ? 'entry uses' : 'entries use'} it`)
+  const usedByText = [uses ? `${uses} ${uses === 1 ? 'entry' : 'entries'}` : null, bills ? `${bills} ${bills === 1 ? 'bill' : 'bills'}` : null].filter(Boolean).join(' and ');
+  const typeControl = editing && locked
+    ? el('p', { class: 'field-hint' }, `${type === 'income' ? 'Money in' : 'Money out'} · can’t change because ${usedByText} use it`)
     : choiceGroup({ name: 'category-type', legend: 'Type', value: type, options: [['expense', 'Money out'], ['income', 'Money in']], onChange: (v) => { type = v; showBucket(); } });
 
   const saveButton = el('button', { class: 'btn btn-primary btn-block', type: 'submit' }, editing ? 'Save changes' : 'Add category');
   const hideButton = editing ? el('button', { class: 'btn btn-secondary btn-block', type: 'button', id: 'toggle-hidden' }, category.archived ? 'Show it again' : 'Hide it') : null;
-  const deleteButton = editing && !uses ? el('button', { class: 'btn btn-danger btn-block', type: 'button', id: 'delete-category' }, 'Delete') : null;
+  const deleteButton = editing && !locked ? el('button', { class: 'btn btn-danger btn-block', type: 'button', id: 'delete-category' }, 'Delete') : null;
 
   const form = el('form', { class: 'section', novalidate: true, id: 'category-form' },
     el('div', { class: 'field' }, el('label', { class: 'field-label', for: 'category-name' }, 'Name'), name, nameError),
@@ -100,7 +103,7 @@ function categoryForm(store, category) {
     hideButton,
     editing && category.archived ? el('p', { class: 'field-hint' }, 'Hidden categories don’t show up when adding, but past entries keep them.') : null,
     deleteButton,
-    editing && uses ? el('p', { class: 'field-hint' }, 'Categories with entries can’t be deleted, so your history stays complete. Hide it instead.') : null,
+    editing && locked ? el('p', { class: 'field-hint' }, `Used by ${usedByText}, so it can’t be deleted (that keeps your history and bills complete). Hide it instead.`) : null,
   );
 
   const done = (result, message) => {

@@ -39,12 +39,12 @@ export function checkPassphrase(passphrase, confirm) {
 
 export const backupFileName = (date) => `budget-manager-backup-${date}.bmbackup`;
 
-export function buildPayload({ transactions, categories, meta }, now = Date.now()) {
+export function buildPayload({ transactions, categories, meta, bills = [] }, now = Date.now()) {
   return {
     app: APP_ID,
     schemaVersion: MIGRATIONS.length,
     exportedAt: now,
-    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)) },
+    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills },
   };
 }
 
@@ -92,6 +92,18 @@ function cleanTransaction(t, categoryTypes) {
   };
 }
 
+function cleanBill(b, categoryTypes) {
+  if (!b || typeof b !== 'object') return null;
+  const name = typeof b.name === 'string' ? cleanNote(b.name) : '';
+  const ok = isUuid(b.id) && isText(name, 40)
+    && Number.isSafeInteger(b.amountCents) && b.amountCents > 0 && b.amountCents <= MAX_CENTS
+    && categoryTypes.get(b.categoryId) === 'expense'
+    && Number.isInteger(b.dayOfMonth) && b.dayOfMonth >= 1 && b.dayOfMonth <= 31
+    && typeof b.active === 'boolean' && isTime(b.createdAt) && isTime(b.updatedAt);
+  if (!ok) return null;
+  return { id: b.id, name, amountCents: b.amountCents, categoryId: b.categoryId, dayOfMonth: b.dayOfMonth, active: b.active, createdAt: b.createdAt, updatedAt: b.updatedAt };
+}
+
 // Returns { ok: true, data, summary } or { ok: false, error } — never a partial result.
 export function validatePayload(payload) {
   const fail = (error) => ({ ok: false, error });
@@ -99,7 +111,10 @@ export function validatePayload(payload) {
   if (!Number.isSafeInteger(payload.schemaVersion) || payload.schemaVersion < 1) return fail('This backup is damaged and can’t be opened.');
   if (payload.schemaVersion > MIGRATIONS.length) return fail('This backup was made by a newer version of the app. Update the app, then try again.');
   const { transactions, categories, meta } = payload.data ?? {};
-  if (!Array.isArray(transactions) || !Array.isArray(categories) || !Array.isArray(meta)) return fail('This backup is damaged and can’t be opened.');
+  // Bills arrived in version 2; older backups simply have none.
+  const bills = payload.schemaVersion >= 2 ? payload.data?.bills : [];
+  if (!Array.isArray(transactions) || !Array.isArray(categories) || !Array.isArray(meta) || !Array.isArray(bills)) return fail('This backup is damaged and can’t be opened.');
+  if (bills.length > 500) return fail('This backup is too large to restore.');
   if (transactions.length > MAX_TRANSACTIONS || categories.length > MAX_CATEGORIES) return fail('This backup is too large to restore.');
 
   const cleanCategories = categories.map(cleanCategory);
@@ -110,6 +125,10 @@ export function validatePayload(payload) {
   const cleanTransactions = transactions.map((t) => cleanTransaction(t, categoryTypes));
   if (cleanTransactions.includes(null)) return fail('This backup has an entry that isn’t valid, so nothing was restored.');
   if (new Set(cleanTransactions.map((t) => t.id)).size !== cleanTransactions.length) return fail('This backup has a repeated entry, so nothing was restored.');
+
+  const cleanBills = bills.map((b) => cleanBill(b, categoryTypes));
+  if (cleanBills.includes(null)) return fail('This backup has a bill that isn’t valid, so nothing was restored.');
+  if (new Set(cleanBills.map((b) => b.id)).size !== cleanBills.length) return fail('This backup has a repeated bill, so nothing was restored.');
 
   const cleanMeta = meta.filter((m) => m && Object.hasOwn(META_RULES, m.key) && META_RULES[m.key](m.value)).map((m) => ({ key: m.key, value: m.value }));
   const exportedAt = isTime(payload.exportedAt) ? payload.exportedAt : null;
@@ -123,8 +142,8 @@ export function validatePayload(payload) {
   const dates = cleanTransactions.map((t) => t.date).sort();
   return {
     ok: true,
-    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta },
-    summary: { entries: cleanTransactions.length, firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null, exportedAt },
+    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills },
+    summary: { entries: cleanTransactions.length, bills: cleanBills.length, firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null, exportedAt },
   };
 }
 

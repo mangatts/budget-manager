@@ -137,9 +137,12 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E9: Safe to Spend + bills
 - **E9-S1** As a user, I want to list my recurring bills (rent, phone, subscriptions) so the app knows what's coming. *(M)*
+  - ✅ Done: More → Bills (add/edit/pause/delete, Undo), auto "paid" detection; database migration v2.
 - **E9-S2** As a user, I want a "Safe to spend today" number on Home so I know what I can spend without a budget. *(M)*
   - AC: formula in PRODUCT.md §2 ②; updates instantly on every entry; "Why?" shows the math; handles no-income and overspent cases kindly.
+  - ✅ Done: hero number on Home, rounded down; "Why?" lists every step.
 - **E9-S3** As a user, I want a heads-up before a bill is due. *(S)*
+  - ✅ Done: "Bills coming up" on Home (next 7 days + overdue). Push notifications later.
 
 ### E10: Cut Plan
 - **E10-S1** As a user, I want 1–2 suggested challenges each month based on my spending. *(M)*
