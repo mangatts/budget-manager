@@ -164,6 +164,8 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E11: Next Best Step + Money Checkup
 - **E11-S1** As a user, I want to (optionally) enter my savings, debts, and goals so advice fits me. *(M)*
+  - ✅ Done: Your money adds emergency savings (0 allowed, blank = skipped) and 401(k) match; new More → Debts (name, balance, APR, minimum; highest rate first, Undo); database v4 `debts`; backups carry both.
+  - Not yet: savings goals (e.g. "$3,000 for a car by June"). Moved to E12-S1, the first story that needs one.
 - **E11-S2** As a user, I want to see which money step I'm on and one clear next action. *(L, split by step)*
 - **E11-S3** As a user, I want a monthly Money Checkup score with 🟢🟡🔴 explanations. *(M)*
 
