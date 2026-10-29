@@ -139,11 +139,17 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E7: Bank statement import
 - **E7-S1** Upload + validate + parse CSV (limits, errors per row) *(M)*
+  - ✅ Done: More → Import a statement; .csv only, ≤ 5 MB, ≤ 10,000 rows, ≤ 50 columns; RFC 4180 parser (quotes, newlines, BOM); "Row 5: “Pending” isn’t a date we can read"; $0 rows left out. Read in the browser, never uploaded; raw text dropped after parsing.
 - **E7-S2** Common bank column layouts + manual column matching *(M)*
+  - ✅ Done: Chase, Capital One, Citi, American Express (charges positive), Bank of America, plus a common Date/Description/Amount (or Debit/Credit) layout; anything else (e.g. Wells Fargo, no headers) → pick Date / Description / Amount or Money out + Money in, with sample values.
 - **E7-S3** Mask account numbers, clean merchant names *(S)*
+  - ✅ Done: 5+ digit runs → `****1234` before anything is stored or shown; "POS DEBIT 10/12 CHIPOTLE 1234 AUSTIN TX" → "Chipotle" (processor prefixes, store numbers, state codes removed).
 - **E7-S4** Duplicate detection *(S)*
+  - ✅ Done: SHA-256 fingerprint per row (repeats within a file kept); rows already imported are left out; rows that match a hand-entered entry (same amount, ±1 day) are flagged "might already be in your entries".
 - **E7-S5** Review screen: add / skip / undo / finish later *(L, split into review UI + queue persistence)*
+  - ✅ Done: one row at a time, "12 of 84 done", Add (needs your category) / Skip / Undo last / Finish later; queue saved on device (database v6 `imports`, `pending`); cancel keeps added entries (Undo). Restoring a backup clears the queue.
 - **E7-S6** Merchant rules + suggestions (highlighted, never pre-selected) *(M)*
+  - ✅ Done: "Always suggest for Chipotle" after you add one (database v6 `merchantRules`, in backups); else your last import of that merchant. Suggested category is shown first with a badge and a stronger border, never selected.
 
 ### E9: Safe to Spend + bills
 - **E9-S1** As a user, I want to list my recurring bills (rent, phone, subscriptions) so the app knows what's coming. *(M)*
@@ -200,7 +206,7 @@ Basic first, then layers (see PRODUCT.md §3).
 | **5** | Know what to cut | E5-S4 → S6, E10-S1 → S3 | First **Cut Plan** challenge, month-end win |
 | **6** ✅ | Know what's next | E11-S1 → S3 | **Next Best Step** + Money Checkup |
 | **7** ✅ | See the future | E12-S1 → S3 | What-If sliders and debt payoff plan |
-| **8–9** | Less typing | E7-S1 → S6 | Import a real statement and categorize it |
+| **8–9** ✅ | Less typing | E7-S1 → S6 | Import a real statement and categorize it |
 | **10** | Smarter | E6-S1 → S3 | Feedback changes which tips show |
 | **Later** | AI coach | E8 | Only after a security review |
 
