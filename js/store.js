@@ -2,7 +2,7 @@
 // then announced to subscribers. Changes return an undo() so the UI can offer "Undo" instead of
 // "Are you sure?" dialogs.
 
-import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge } from './services/validate.js';
+import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge, validateDebt } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
 import { newId as defaultNewId } from './utils/id.js';
 import { todayLocal } from './utils/dates.js';
@@ -13,18 +13,19 @@ const SAVE_FAILED = { form: 'Couldn’t save on this device. Check that the brow
 const byNewest = (a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1);
 
 // Stored rows → app state (sorted lists, meta as a key → value object).
-const shape = ({ categories, transactions, meta, bills = [], challenges = [] }) => ({
+const shape = ({ categories, transactions, meta, bills = [], challenges = [], debts = [] }) => ({
   categories: [...categories].sort((a, b) => a.order - b.order),
   transactions: [...transactions].sort(byNewest),
   meta: Object.fromEntries(meta.map((m) => [m.key, m.value])),
   bills: [...bills].sort(byDueDay),
   challenges: [...challenges].sort((a, b) => b.createdAt - a.createdAt),
+  debts: [...debts].sort((a, b) => b.aprBps - a.aprBps || a.name.localeCompare(b.name)),
 });
 
 const byDueDay = (a, b) => a.dayOfMonth - b.dayOfMonth || a.name.localeCompare(b.name);
 
 export function createStore({ repo, now = Date.now, newId = defaultNewId, today = todayLocal }) {
-  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [] };
+  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [], debts: [] };
   const listeners = new Set();
 
   const set = (changes) => {
@@ -99,6 +100,19 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     return { ok: true, record, undo };
   }
 
+  // Generic save-with-undo for simple stores (debts).
+  async function saveRecord(storeName, record, before) {
+    try { await repo.put(storeName, record); } catch { return { ok: false, errors: SAVE_FAILED }; }
+    const resort = (list) => shape({ ...state, meta: [], [storeName]: list })[storeName];
+    set({ [storeName]: resort([...state[storeName].filter((r) => r.id !== record.id), record]) });
+    const undo = async () => {
+      if (before) return orThrow(await saveRecord(storeName, before, null));
+      try { await repo.delete(storeName, record.id); } catch { throw refuse(SAVE_FAILED.form); }
+      set({ [storeName]: state[storeName].filter((r) => r.id !== record.id) });
+    };
+    return { ok: true, record, undo };
+  }
+
   async function saveChallenge(record, before) {
     try {
       await repo.put('challenges', record);
@@ -129,8 +143,8 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
 
     async init() {
       await seedCategoriesOnce(repo);
-      const [categories, transactions, meta, bills, challenges] = await Promise.all(['categories', 'transactions', 'meta', 'bills', 'challenges'].map((name) => repo.getAll(name)));
-      set({ ready: true, ...shape({ categories, transactions, meta, bills, challenges }) });
+      const [categories, transactions, meta, bills, challenges, debts] = await Promise.all(['categories', 'transactions', 'meta', 'bills', 'challenges', 'debts'].map((name) => repo.getAll(name)));
+      set({ ready: true, ...shape({ categories, transactions, meta, bills, challenges, debts }) });
     },
 
     async addTransaction(input) {
@@ -168,6 +182,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         meta: Object.entries(state.meta).map(([key, value]) => ({ key, value })),
         bills: state.bills.map((b) => ({ ...b })),
         challenges: state.challenges.map((c) => ({ ...c })),
+        debts: state.debts.map((d) => ({ ...d })),
       };
     },
 
@@ -180,7 +195,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     async setProfile(input) {
       const result = validateProfile(input);
       if (!result.ok) return result;
-      const before = { monthlyTakeHomeCents: state.meta.monthlyTakeHomeCents ?? null, savingsPercent: state.meta.savingsPercent };
+      const before = Object.fromEntries(Object.keys(result.value).map((k) => [k, state.meta[k]]));
       // undefined = "wasn't set before", so undo removes it rather than leaving the new value.
       const write = async (values) => {
         const entries = Object.entries(values);
@@ -203,7 +218,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     // Replaces everything (restore). Data must already be validated (services/backup.js).
     async replaceAll(data) {
       const before = this.snapshot();
-      data = { bills: [], challenges: [], ...data }; // older backups have neither
+      data = { bills: [], challenges: [], debts: [], ...data }; // older backups lack newer stores
       try {
         await repo.replaceAll(data);
       } catch {
@@ -281,6 +296,31 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       const result = validateBill(input, { categories: state.categories, keepCategoryId: before.categoryId });
       if (!result.ok) return result;
       return saveBill({ ...before, ...result.value, updatedAt: now() }, before);
+    },
+
+    // ── Debts ── (each returns undo)
+
+    async addDebt(input) {
+      const result = validateDebt(input);
+      if (!result.ok) return result;
+      const time = now();
+      return saveRecord('debts', { id: newId(), ...result.value, createdAt: time, updatedAt: time }, null);
+    },
+
+    async updateDebt(id, input) {
+      const before = state.debts.find((d) => d.id === id);
+      if (!before) return { ok: false, errors: { form: 'This debt no longer exists.' } };
+      const result = validateDebt(input);
+      if (!result.ok) return result;
+      return saveRecord('debts', { ...before, ...result.value, updatedAt: now() }, before);
+    },
+
+    async deleteDebt(id) {
+      const before = state.debts.find((d) => d.id === id);
+      if (!before) return { ok: false, errors: { form: 'This debt no longer exists.' } };
+      try { await repo.delete('debts', id); } catch { return { ok: false, errors: SAVE_FAILED }; }
+      set({ debts: state.debts.filter((d) => d.id !== id) });
+      return { ok: true, undo: async () => orThrow(await saveRecord('debts', before, null)) };
     },
 
     // ── Cut Plan challenges ── (each returns undo)

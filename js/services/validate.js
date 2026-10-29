@@ -24,6 +24,11 @@ export function parseAmount(input) {
   return { cents };
 }
 
+// Like parseAmount, but "0", "0.00", or "$0" are allowed (for "I have none").
+export function parseAmountOrZero(input) {
+  return /^\$?\s*0*(?:\.0*)?$/.test(String(input ?? '').trim()) && /\d/.test(String(input)) ? { cents: 0 } : parseAmount(input);
+}
+
 // Removes control and text-direction characters (which can disguise text), collapses whitespace.
 export function cleanNote(input) {
   return String(input ?? '')
@@ -100,6 +105,8 @@ export function validateCategory(input, { categories, editingId = null }) {
 // ── Money profile (More → Your money) ──
 
 export const DEFAULT_SAVINGS_PERCENT = 20; // the "20" in 50/30/20
+// 401(k) match: 'full' (getting all of it), 'partial', 'none' (no match offered), 'unsure'
+export const EMPLOYER_MATCH = Object.freeze(['full', 'partial', 'none', 'unsure']);
 export const MAX_SAVINGS_PERCENT = 50;
 
 // input: { takeHome: "4,500" | "" , savingsPercent: "20" } → { monthlyTakeHomeCents: int | null, savingsPercent: int }
@@ -115,8 +122,51 @@ export function validateProfile(input) {
   const text = String(raw.savingsPercent ?? '').trim().replace(/%$/, '');
   const percent = /^\d{1,3}$/.test(text) ? Number(text) : NaN;
   if (!(percent >= 0 && percent <= MAX_SAVINGS_PERCENT)) errors.savingsPercent = `Enter a whole number from 0 to ${MAX_SAVINGS_PERCENT}`;
+  // Optional: emergency savings (blank = not answered) and 401(k) match.
+  let emergencyFundCents;
+  if (raw.emergencyFund !== undefined) {
+    emergencyFundCents = null;
+    if (String(raw.emergencyFund ?? '').trim() !== '') {
+      const fund = parseAmountOrZero(raw.emergencyFund);
+      if (fund.error) errors.emergencyFund = fund.error;
+      else emergencyFundCents = fund.cents;
+    }
+  }
+  let employerMatch;
+  if (raw.employerMatch !== undefined) {
+    employerMatch = EMPLOYER_MATCH.includes(raw.employerMatch) ? raw.employerMatch : null;
+  }
   if (Object.keys(errors).length) return { ok: false, errors };
-  return { ok: true, value: { monthlyTakeHomeCents, savingsPercent: percent } };
+  return { ok: true, value: { monthlyTakeHomeCents, savingsPercent: percent, ...(emergencyFundCents !== undefined && { emergencyFundCents }), ...(employerMatch !== undefined && { employerMatch }) } };
+}
+
+// ── Debts (Next Best Step) ──
+
+export const MAX_APR_BPS = 9999; // 99.99%
+
+// "24.99" or "24.99%" → 2499 basis points, parsed as text (no floating point).
+export function parseApr(input) {
+  const text = String(input ?? '').trim().replace(/%$/, '').trim();
+  const match = /^(\d{1,2})(?:\.(\d{1,2}))?$/.exec(text);
+  if (!match) return { error: 'Enter the interest rate, like 24.99' };
+  return { bps: Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0')) };
+}
+
+// input: { name, balance, apr, minPayment }
+export function validateDebt(input) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const errors = {};
+  const name = cleanNote(raw.name);
+  if (!name) errors.name = 'Give it a name, like Visa or Car loan';
+  else if ([...name].length > 40) errors.name = 'Names can be up to 40 characters.';
+  const balance = parseAmount(raw.balance);
+  if (balance.error) errors.balance = balance.error;
+  const apr = parseApr(raw.apr);
+  if (apr.error) errors.apr = apr.error;
+  const min = String(raw.minPayment ?? '').trim() === '' ? { cents: 0 } : parseAmountOrZero(raw.minPayment);
+  if (min.error) errors.minPayment = min.error;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, value: { name, balanceCents: balance.cents, aprBps: apr.bps, minPaymentCents: min.cents } };
 }
 
 // ── Cut Plan challenges ──

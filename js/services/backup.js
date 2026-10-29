@@ -21,6 +21,9 @@ const META_RULES = {
   lastBackupAt: (v) => Number.isSafeInteger(v) && v > 0,
   monthlyTakeHomeCents: (v) => v === null || (Number.isSafeInteger(v) && v > 0 && v <= MAX_CENTS),
   savingsPercent: (v) => Number.isSafeInteger(v) && v >= 0 && v <= 50,
+  emergencyFundCents: (v) => v === null || (Number.isSafeInteger(v) && v >= 0 && v <= MAX_CENTS),
+  employerMatch: (v) => v === null || ['full', 'partial', 'none', 'unsure'].includes(v),
+  skippedSteps: (v) => Array.isArray(v) && v.length <= 20 && v.every((s) => typeof s === 'string' && /^[a-z-]{1,30}$/.test(s)),
 };
 const META_KEYS = new Set(Object.keys(META_RULES));
 const BUCKETS = new Set(['need', 'want', 'savings', null]);
@@ -39,12 +42,12 @@ export function checkPassphrase(passphrase, confirm) {
 
 export const backupFileName = (date) => `budget-manager-backup-${date}.bmbackup`;
 
-export function buildPayload({ transactions, categories, meta, bills = [], challenges = [] }, now = Date.now()) {
+export function buildPayload({ transactions, categories, meta, bills = [], challenges = [], debts = [] }, now = Date.now()) {
   return {
     app: APP_ID,
     schemaVersion: MIGRATIONS.length,
     exportedAt: now,
-    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills, challenges },
+    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills, challenges, debts },
   };
 }
 
@@ -115,6 +118,18 @@ function cleanChallenge(c, categoryTypes) {
   return { id: c.id, categoryId: c.categoryId, month: c.month, fromCents: c.fromCents, targetCents: c.targetCents, status: c.status, createdAt: c.createdAt };
 }
 
+function cleanDebt(d) {
+  if (!d || typeof d !== 'object') return null;
+  const name = typeof d.name === 'string' ? cleanNote(d.name) : '';
+  const ok = isUuid(d.id) && isText(name, 40)
+    && Number.isSafeInteger(d.balanceCents) && d.balanceCents > 0 && d.balanceCents <= MAX_CENTS
+    && Number.isSafeInteger(d.aprBps) && d.aprBps >= 0 && d.aprBps <= 9999
+    && Number.isSafeInteger(d.minPaymentCents) && d.minPaymentCents >= 0 && d.minPaymentCents <= MAX_CENTS
+    && isTime(d.createdAt) && isTime(d.updatedAt);
+  if (!ok) return null;
+  return { id: d.id, name, balanceCents: d.balanceCents, aprBps: d.aprBps, minPaymentCents: d.minPaymentCents, createdAt: d.createdAt, updatedAt: d.updatedAt };
+}
+
 // Returns { ok: true, data, summary } or { ok: false, error } — never a partial result.
 export function validatePayload(payload) {
   const fail = (error) => ({ ok: false, error });
@@ -126,6 +141,12 @@ export function validatePayload(payload) {
   const bills = payload.schemaVersion >= 2 ? payload.data?.bills : [];
   // Challenges arrived in version 3.
   const challenges = payload.schemaVersion >= 3 ? payload.data?.challenges : [];
+  // Debts arrived in version 4.
+  const debts = payload.schemaVersion >= 4 ? payload.data?.debts : [];
+  if (!Array.isArray(debts) || debts.length > 100) return fail('This backup is damaged and can\u2019t be opened.');
+  const cleanDebts = debts.map(cleanDebt);
+  if (cleanDebts.includes(null)) return fail('This backup has a debt that isn\u2019t valid, so nothing was restored.');
+  if (new Set(cleanDebts.map((d) => d.id)).size !== cleanDebts.length) return fail('This backup has a repeated debt, so nothing was restored.');
   if (!Array.isArray(challenges) || challenges.length > 2000) return fail('This backup is damaged and can\u2019t be opened.');
   if (!Array.isArray(transactions) || !Array.isArray(categories) || !Array.isArray(meta) || !Array.isArray(bills)) return fail('This backup is damaged and can’t be opened.');
   if (bills.length > 500) return fail('This backup is too large to restore.');
@@ -161,7 +182,7 @@ export function validatePayload(payload) {
   const dates = cleanTransactions.map((t) => t.date).sort();
   return {
     ok: true,
-    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges },
+    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges, debts: cleanDebts },
     summary: { entries: cleanTransactions.length, bills: cleanBills.length, firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null, exportedAt },
   };
 }
