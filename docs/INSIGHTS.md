@@ -93,6 +93,8 @@ Each pattern is simple statistics computed on the device in `patterns.js`.
 | **Day/week habits** | Spending by weekday | "Most of your Dining Out happens on **Fridays**." |
 | **Money left** | Income − expenses this month | "You have **$320 left** this month." |
 
+**Built (Sprint 5):** pace, higher-than-usual, spikes, small stuff, repeating charges, and best month live in `js/services/insights/engine.js`, each with "Why?" and a "stay quiet" test. Tips are ranked by money × confidence, with one tip per category topic. Spikes are informational and shown last.
+
 **Minimum data rules:** a pattern only shows when there's enough data (e.g. "your usual" needs ≥ 2 months). Without that, the app says "Keep adding expenses. More tips unlock after a month."
 
 ---

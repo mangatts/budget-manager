@@ -122,10 +122,15 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E5-S1** Pace projection *(S)*
   - ✅ Done: "running ahead of your usual" (median of last 3 months; skips bills, housing, savings, first week).
 - **E5-S2** "Your usual" baselines (median) and higher-than-usual tips *(M)*
+  - ✅ Done: last month vs the median of the 3 before (spending months only).
 - **E5-S3** Unusual spike detection *(S)*
+  - ✅ Done: last 14 days, ≥3× your usual charge and ≥$50; informational, shown after money tips.
 - **E5-S4** Small purchases add up *(S)*
+  - ✅ Done: 8+ purchases under $15 totalling $60+ last month; yearly cost shown.
 - **E5-S5** Repeating charges / subscriptions finder *(M)*
+  - ✅ Done: same category + note within 5% in 3 of the last 4 months; skips needs and known bills.
 - **E5-S6** Best-month savings target *(S)*
+  - ✅ Done: lowest of the last 6 spending months vs usual, wants only.
 
 ### E6: Smart Coach L3 (learning)
 - **E6-S1** As a user, I want to tell the app 👍 / 👎 / "I'm on it" so it shows me more useful tips. *(M)*

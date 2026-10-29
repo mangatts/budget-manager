@@ -22,9 +22,10 @@ function render(body, state) {
       few ? el('a', { class: 'btn btn-primary', href: '#/add' }, '＋ Add an expense') : null,
     ));
   } else {
-    const total = tips.filter((t) => t.level).reduce((s, t) => s + t.estimatedMonthlySavingsCents, 0);
+    // Tips can overlap (coffee runs are part of Dining Out), so don't add them up: name the biggest.
+    const biggest = Math.max(...tips.map((t) => t.estimatedMonthlySavingsCents));
     body.append(
-      el('p', { class: 'lead', id: 'tips-summary' }, `${tips.length} ${tips.length === 1 ? 'idea' : 'ideas'}, up to about ${formatCents(Math.round(total / 100) * 100)} a month. Biggest first.`),
+      el('p', { class: 'lead', id: 'tips-summary' }, `${tips.length} ${tips.length === 1 ? 'idea' : 'ideas'}, biggest first.${biggest > 0 ? ` The biggest could free up about ${formatCents(Math.round(biggest / 100) * 100)} a month.` : ''}`),
       el('div', { class: 'section', id: 'tips-list' }, tips.map(tipCard)),
     );
   }
