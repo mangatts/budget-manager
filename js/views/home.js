@@ -12,6 +12,7 @@ import { splitChart } from '../ui/splitChart.js';
 import { billStatusPill } from './bills.js';
 import { topTips } from './tips.js';
 import { cutPlanHome } from '../ui/cutPlan.js';
+import { nextStepHome } from '../ui/nextStep.js';
 
 // Remembered while the app is open.
 let month = null;
@@ -100,6 +101,7 @@ export function homeView() {
       const today = todayLocal();
       clear(todaySlot);
       todaySlot.append(safeToSpendCard(state, today));
+      todaySlot.append(nextStepHome(store, today));
       const upcoming = upcomingSection(state, today);
       if (upcoming) todaySlot.append(upcoming);
       const challenges = cutPlanHome(store, today);

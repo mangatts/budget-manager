@@ -10,6 +10,7 @@ import { profileView } from './views/profile.js';
 import { billsView, billView } from './views/bills.js';
 import { debtsView, debtView } from './views/debts.js';
 import { tipsView } from './views/tips.js';
+import { stepsView, checkupView } from './views/steps.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
 import { initToasts, setStickyToast } from './ui/toast.js';
@@ -34,6 +35,8 @@ const routes = {
   bill: { title: 'Bill', view: billView, tab: 'more' }, // #/bill/<id> or #/bill/new
   debts: { title: 'Debts', view: debtsView, tab: 'more' },
   debt: { title: 'Debt', view: debtView, tab: 'more' }, // #/debt/<id> or #/debt/new
+  steps: { title: 'Your money steps', view: stepsView, tab: 'home' },
+  checkup: { title: 'Money Checkup', view: checkupView, tab: 'home' },
   design: { title: 'Design reference', view: designView }, // not in the tab bar
 };
 
