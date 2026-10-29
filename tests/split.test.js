@@ -47,3 +47,9 @@ test('percent can exceed 100 when spending is above income (the bar caps, the nu
   const s = fiftyThirtyTwenty(state([...five, tx(800000, 'c-housing')], { monthlyTakeHomeCents: 400000 }), '2026-10');
   assert.equal(s.groups[0].percent, 245);
 });
+
+test('finished months read in the past tense', () => {
+  const groups = [{ key: 'need', percent: 40, status: 'ok' }, { key: 'want', percent: 20, status: 'ok' }, { key: 'savings', percent: 10, status: 'low' }];
+  assert.equal(headline(groups, { past: true }), 'You put 10% of your income toward savings. The guideline is 20%.');
+  assert.equal(headline(groups.map((g) => ({ ...g, status: 'ok' })), { past: true }), 'You stayed within the 50/30/20 guideline that month. Nice work.');
+});

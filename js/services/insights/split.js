@@ -1,5 +1,6 @@
 // Needs / Wants / Savings as a share of income, against the 50/30/20 guideline (E4-S3). Pure.
 import { inMonth, byBucket, incomeForMonth } from './month.js';
+import { todayLocal, monthKey } from '../../utils/dates.js';
 import { INCOME_BENCHMARKS } from './benchmarkData.js';
 
 export const MIN_ENTRIES = 5; // fewer than this and the split says more about timing than habits
@@ -26,16 +27,18 @@ export function fiftyThirtyTwenty(state, month) {
     const status = over === 'high' ? (percent > guideline ? 'high' : 'ok') : (percent < guideline ? 'low' : 'ok');
     return { key, label: benchmark.label, cents: sums[key], percent, guideline, status, note: benchmark.note };
   });
-  return { available: true, incomeCents: income.cents, incomeSource: income.source, groups, headline: headline(groups) };
+  const past = month < monthKey(todayLocal());
+  return { available: true, incomeCents: income.cents, incomeSource: income.source, groups, headline: headline(groups, { past }) };
 }
 
 // One plain sentence about the biggest gap. Neutral wording: information, not judgment.
-export function headline(groups) {
+// `past`: a finished month reads "You put…"; the current one "You’ve put … so far".
+export function headline(groups, { past = false } = {}) {
   const byKey = Object.fromEntries(groups.map((g) => [g.key, g]));
   const gaps = [
     byKey.want.status === 'high' && { size: byKey.want.percent - 30, text: `Wants are ${byKey.want.percent}% of your income. The guideline is 30%.` },
     byKey.need.status === 'high' && { size: byKey.need.percent - 50, text: `Needs are ${byKey.need.percent}% of your income. The guideline is 50%.` },
-    byKey.savings.status === 'low' && { size: 20 - byKey.savings.percent, text: `You’ve put ${byKey.savings.percent}% of your income toward savings so far. The guideline is 20%.` },
+    byKey.savings.status === 'low' && { size: 20 - byKey.savings.percent, text: past ? `You put ${byKey.savings.percent}% of your income toward savings. The guideline is 20%.` : `You’ve put ${byKey.savings.percent}% of your income toward savings so far. The guideline is 20%.` },
   ].filter(Boolean).sort((a, b) => b.size - a.size);
-  return gaps[0]?.text ?? 'You’re within the 50/30/20 guideline this month. Nice work.';
+  return gaps[0]?.text ?? (past ? 'You stayed within the 50/30/20 guideline that month. Nice work.' : 'You’re within the 50/30/20 guideline this month. Nice work.');
 }
