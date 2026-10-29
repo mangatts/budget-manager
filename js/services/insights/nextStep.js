@@ -3,14 +3,17 @@
 // "current" (the first not done or skipped). Pure functions; money is integer cents. Not financial advice.
 import { monthKey, shiftMonth } from '../../utils/dates.js';
 import { inMonth, monthlyIncome } from './month.js';
+import { formatCents as fmt } from '../../utils/money.js';
+import { STEP_IDS } from '../validate.js';
 import { INCOME_BENCHMARKS } from './benchmarkData.js';
 
 export const STARTER_FUND_CENTS = 100000; // $1,000 starter safety net
-export const HIGH_APR_BPS = 800; // above ~8% APR counts as high-interest
+export const HIGH_APR_BPS = 800; // above 8% APR counts as high-interest
+export const isHighInterest = (debt) => debt.aprBps > HIGH_APR_BPS;
 export const FULL_FUND_MONTHS = 3;
 export const SAVE_RATE_GOAL = 0.15;
 
-export const STEP_IDS = Object.freeze(['spend-less', 'starter-fund', 'match', 'high-interest', 'full-fund', 'save-15', 'goals']);
+export { STEP_IDS };
 
 const SOURCES = {
   cashflow: 'Basic cash flow: spend less than comes in',
@@ -21,13 +24,13 @@ const SOURCES = {
   savings: 'Retirement guidance and the 50/30/20 rule of thumb (save 15–20% of income)',
 };
 
-// One month's figures. Money in is the higher of what was recorded and the take-home you entered
-// (like Safe to Spend). Spending leaves out money moved to savings, which is counted separately.
+// One month's figures. Money in is the higher of what was recorded and your expected monthly income
+// (take-home you entered, or estimated from recent months), like Safe to Spend. Spending leaves out money moved to savings, which is counted separately.
 export function monthFigures(state, month) {
   const byId = new Map(state.categories.map((c) => [c.id, c]));
   const entries = inMonth(state.transactions, month);
   const recorded = entries.filter((t) => t.type === 'income').reduce((s, t) => s + t.amountCents, 0);
-  const expected = Number.isSafeInteger(state.meta.monthlyTakeHomeCents) ? state.meta.monthlyTakeHomeCents : 0;
+  const expected = monthlyIncome(state, month)?.cents ?? 0;
   const f = { inCents: Math.max(recorded, expected), spentCents: 0, savedCents: 0, needsCents: 0, housingCents: 0, debtPaymentsCents: 0 };
   for (const t of entries) {
     if (t.type !== 'expense') continue;
@@ -58,8 +61,7 @@ export function recentMonths(state, today) {
 // Interest a debt costs per month at its current balance (simple monthly rate).
 export const monthlyInterest = (debt) => Math.round((debt.balanceCents * debt.aprBps) / 10000 / 12);
 
-const pct = (part, whole) => Math.round((part / whole) * 100);
-const fmt = (cents) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const pct = (part, whole) => Math.round((part / whole) * 100);
 const ask = (message, label, href) => ({ status: 'ask', message, action: { label, href } });
 
 function spendLess(recent, income) {
@@ -88,14 +90,14 @@ function match(answer) {
   const why = { lines: [['Your answer', { full: 'Getting all of it', partial: 'Getting some of it', none: 'No match offered', unsure: 'Not sure' }[answer] ?? 'Not answered']], source: SOURCES.match, note: 'A match is part of your pay that you only get if you put money in yourself.' };
   if (answer === 'full') return { ...step, status: 'done', message: 'You’re getting your full match.', why };
   if (answer === 'none') return { ...step, status: 'done', message: 'No match offered, so this step doesn’t apply.', why };
-  if (answer === 'partial') return { ...step, status: 'todo', message: 'Free money: raise your 401(k) contribution to at least what your employer matches. Ask HR or check your benefits site for the exact percent.', why };
+  if (answer === 'partial') return { ...step, status: 'todo', message: 'Free money: raise your 401(k) contribution to at least what your employer matches. Ask HR or check your benefits site for the exact percent.', action: { label: 'Update your answer', href: '#/profile' }, why };
   if (answer === 'unsure') return { ...step, status: 'todo', message: 'Worth a quick check: ask HR or your benefits site whether your job matches 401(k) savings, and how much you need to put in to get all of it.', action: { label: 'Update your answer', href: '#/profile' }, why };
   return { ...step, ...ask('Does your job match what you put in a 401(k)?', 'Answer one question', '#/profile') };
 }
 
 function highInterest(debts) {
   const step = { id: 'high-interest', title: 'Pay off high-interest debt' };
-  const high = debts.filter((d) => d.aprBps >= HIGH_APR_BPS).sort((a, b) => b.aprBps - a.aprBps || b.balanceCents - a.balanceCents);
+  const high = debts.filter(isHighInterest).sort((a, b) => b.aprBps - a.aprBps || b.balanceCents - a.balanceCents);
   if (!high.length) {
     return { ...step, status: 'done', message: debts.length ? 'No debts above 8% interest.' : 'No high-interest debts added. If you have credit card debt, add it under More → Debts.', why: { lines: [['Debts above 8% interest', '0']], source: SOURCES.debt } };
   }

@@ -3,12 +3,11 @@
 // Pure functions; money is integer cents. General education, not financial advice.
 import { monthKey, shiftMonth } from '../../utils/dates.js';
 import { inMonth } from './month.js';
-import { monthFigures, HIGH_APR_BPS } from './nextStep.js';
+import { monthFigures, isHighInterest, pct } from './nextStep.js';
 import { INCOME_BENCHMARKS } from './benchmarkData.js';
 
 export const MIN_SIGNALS = 3; // fewer known signals and a score would mislead
 const POINTS = { good: 20, ok: 10, poor: 0 };
-const pct = (part, whole) => Math.round((part / whole) * 100);
 
 // The month the checkup is about: last month if it has spending, else the one before (up to 3 back).
 export function checkupMonth(transactions, today) {
@@ -60,7 +59,7 @@ function housing(f) {
 function debt(f, debts) {
   const base = { id: 'debt', label: 'Debt payments', source: INCOME_BENCHMARKS.debt.source };
   const share = pct(f.debtPaymentsCents, f.inCents);
-  const high = debts.filter((d) => d.aprBps >= HIGH_APR_BPS);
+  const high = debts.filter(isHighInterest);
   const lines = [['Debt payments that month', f.debtPaymentsCents], ['Share of income', `${share}%`], ['Debts above 8% interest', String(high.length)]];
   const note = 'Lenders measure against income before taxes; we use take-home, so this reads a little high.';
   if (share > 36) return { ...base, lines, note, status: 'poor', message: `Debt payments took ${share}% of income, above the 36% limit lenders use.` };

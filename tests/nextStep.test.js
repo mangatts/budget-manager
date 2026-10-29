@@ -133,3 +133,28 @@ test('checkup waits for a full month, and for some money in', () => {
   assert.deepEqual(moneyCheckup(state({ transactions: [tx('c-dining', 5, TODAY)] }), TODAY), { available: false, reason: 'no-month' });
   assert.equal(moneyCheckup(state({ transactions: [tx('c-dining', 50)] }), TODAY).reason, 'no-income');
 });
+
+// ── Regression tests (code review) ──
+
+test('undoing one skip leaves later skips alone', async () => {
+  const store = createStore({ repo: createRepository(createMemoryAdapter()), now: () => 1, newId: () => 'x', today: () => TODAY });
+  await store.init();
+  const first = await store.setStepSkipped('match', true);
+  await store.setStepSkipped('high-interest', true);
+  await first.undo();
+  assert.deepEqual(store.getState().meta.skippedSteps, ['high-interest']);
+});
+
+test('a month without logged pay uses estimated income, not $0', () => {
+  // Pay logged in July and August, not yet in September: September isn't "overspending".
+  const transactions = [tx('c-paycheck', 4000, '2026-07-15'), tx('c-paycheck', 4000, '2026-08-15'), ...september().filter((t) => t.categoryId !== 'c-paycheck')];
+  const s = byId(moneySteps(state({ transactions }), TODAY));
+  assert.equal(s['spend-less'].status, 'done');
+  assert.equal(moneyCheckup(state({ transactions }), TODAY).available, true);
+});
+
+test('8% exactly isn’t "above 8%"; a partial match has a way to update the answer', () => {
+  const steps = byId(moneySteps(state({ meta: { emergencyFundCents: 150000, employerMatch: 'partial' }, debts: [{ ...visa, aprBps: 800 }] }), TODAY));
+  assert.equal(steps['high-interest'].status, 'done');
+  assert.deepEqual(steps.match.action, { label: 'Update your answer', href: '#/profile' });
+});
