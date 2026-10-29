@@ -230,6 +230,8 @@ budget-manager/
 │   ├── views/
 │   │   ├── design.js       # #/design reference page (hidden route)
 │   │   ├── backup.js       # More → Backups (save / restore)
+│   │   ├── categories.js   # More → Categories (list + edit)
+│   │   ├── wipe.js         # More → Delete everything
 │   │   ├── more.js         # More → Display settings
 │   │   ├── home.js
 │   │   ├── addTransaction.js

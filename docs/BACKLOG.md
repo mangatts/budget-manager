@@ -81,6 +81,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E1-S5** As a user, I want to see, search, edit, and delete past transactions, with undo. *(M)*
   - ✅ Done: month switcher + totals, search (note/category, accent-insensitive), grouped by day, tap to edit, delete and edit both undoable, safe `#/edit/<id>` links.
 - **E1-S6** As a user, I want to rename, add, or archive categories. *(S)*
+  - ✅ Done: rename, add (icon + Need/Want/Savings), hide/show, delete if unused; all undoable.
 
 ### E2: Never lose data
 - **E2-S1** As a user, I want the browser to keep my data permanently, and to see that it's protected. *(S)*: `storage.persist()` + status.
@@ -94,6 +95,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E2-S5** As a user, I want to install the app and use it offline. *(M)*: manifest, icons, versioned SW, update prompt.
   - ✅ Done: installable (Android prompt, iPhone steps), works with the server off, safe update flow; tested end to end.
 - **E2-S6** As a user, I want to delete all my data if I choose. *(S)*
+  - ✅ Done: offers a backup first, type DELETE to confirm, fresh start; app still works offline.
 
 ### E3: Home dashboard
 - **E3-S1** As a user, I want to see money in, money out, and what's left this month. *(S)*
