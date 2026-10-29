@@ -711,3 +711,16 @@ select.input {
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
 }
+
+/* ── Statement review ── */
+.review-merchant {
+  font-size: var(--text-xl);
+  margin: 0;
+}
+.choice-suggested > span {
+  border-color: var(--accent);
+  border-width: var(--border-width-strong);
+}
+.suggest-pill {
+  margin-left: auto;
+}

@@ -11,6 +11,8 @@ import { billsView, billView } from './views/bills.js';
 import { debtsView, debtView } from './views/debts.js';
 import { goalsView, goalView } from './views/goals.js';
 import { whatIfView } from './views/whatif.js';
+import { importView } from './views/import.js';
+import { reviewView } from './views/review.js';
 import { tipsView } from './views/tips.js';
 import { stepsView, checkupView } from './views/steps.js';
 import { designView } from './views/design.js';
@@ -40,6 +42,8 @@ const routes = {
   goals: { title: 'Goals', view: goalsView, tab: 'more' },
   goal: { title: 'Goal', view: goalView, tab: 'more' }, // #/goal/<id> or #/goal/new
   whatif: { title: 'What if…', view: whatIfView, tab: 'more' },
+  import: { title: 'Import a statement', view: importView, tab: 'more' },
+  review: { title: 'Review your statement', view: reviewView, tab: 'more' },
   steps: { title: 'Your money steps', view: stepsView, tab: 'home' },
   checkup: { title: 'Money Checkup', view: checkupView, tab: 'home' },
   design: { title: 'Design reference', view: designView }, // not in the tab bar
