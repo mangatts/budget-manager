@@ -8,6 +8,7 @@
     "start": "python3 -m http.server 5500 --bind 127.0.0.1",
     "test": "node --test",
     "check": "bash scripts/check-security.sh",
-    "e2e": "node tests/e2e/run.mjs"
+    "e2e": "node tests/e2e/run.mjs",
+    "precache": "node scripts/precache.mjs"
   }
 }

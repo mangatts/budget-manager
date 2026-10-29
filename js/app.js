@@ -6,7 +6,8 @@ import { addView, editView } from './views/add.js';
 import { historyView } from './views/history.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
-import { initToasts } from './ui/toast.js';
+import { initToasts, setStickyToast } from './ui/toast.js';
+import { registerServiceWorker, requestPersistence } from './services/pwa.js';
 
 const APP_NAME = 'Budget Manager';
 
@@ -40,4 +41,14 @@ initToasts();
 
 // Open the on-device database early (creates it and adds default categories on first run).
 // If this browser can't store data, screens that need it will say so.
-getStore().catch(() => document.documentElement.setAttribute('data-storage', 'unavailable'));
+getStore().then((store) => {
+  // Once there's something worth keeping, ask the browser not to clean it up.
+  const ask = () => { if (store.getState().transactions.length) { requestPersistence(); return true; } return false; };
+  if (!ask()) { const stop = store.subscribe(() => { if (ask()) stop(); }); }
+}).catch(() => document.documentElement.setAttribute('data-storage', 'unavailable'));
+
+// Offline support. A new version waits until the person chooses to update.
+registerServiceWorker({
+  // Sticky: if a "Saved" message replaces it, it comes back afterwards.
+  onUpdateReady: (apply) => setStickyToast({ message: 'New version ready', action: { label: 'Update', run: () => { apply(); return 'Updating\u2026'; } } }),
+});

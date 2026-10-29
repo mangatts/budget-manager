@@ -51,9 +51,11 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
   base-uri 'none';
   form-action 'none';
   require-trusted-types-for 'script';
+  trusted-types bm-sw;
   upgrade-insecure-requests">
 ```
 - No inline scripts or styles, no `eval`, no third-party origins.
+- Trusted Types: the only allowed policy is `bm-sw` (`js/services/pwa.js`), which permits exactly one script URL, `./sw.js`, to register the offline worker.
 - GitHub Pages can't send headers like `frame-ancestors`, `X-Content-Type-Options`, or `Referrer-Policy`. Add `<meta name="referrer" content="no-referrer">`. **If we need real headers, move to Cloudflare Pages or Netlify**, which use a `_headers` file.
 
 ### 2.2 Safe rendering
@@ -94,9 +96,12 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 - No network calls at all except loading the app itself.
 - "Delete all data" in Settings wipes IndexedDB, caches, and localStorage.
 
-### 2.7 Service worker
-- Caches only same-origin app files, with a versioned cache name. Old caches are deleted on activate.
-- Shows a "New version available, tap to update" prompt rather than silently swapping code mid-session.
+### 2.7 Service worker (built in E2-S5)
+- Caches only same-origin app files, from a generated list (`npm run precache`). CI fails if the list is stale.
+- Never handles other origins or non-GET requests, and never caches user data (IndexedDB holds that).
+- Versioned cache (content hash). Old caches are deleted on activate. Install bypasses the HTTP cache so versions never mix.
+- Updates wait: "New version ready · Update". The app never swaps code mid-session.
+- Registered through the `bm-sw` Trusted Types policy, which allows only `./sw.js`.
 
 ---
 
