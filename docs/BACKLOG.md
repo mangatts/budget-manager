@@ -190,6 +190,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E8: AI coach (optional, later)
 - **E8-S0** Security review + design of the proxy and data-sharing *(M)*. **Blocks the rest of E8.**
+  - ✅ Done: [AI_COACH.md](AI_COACH.md): summary-only payload (allow-listed, shown before sending), Cloudflare Worker proxy holding the key, structured answers whose figures are checked against what was sent, threat model, cost estimate, required tests. **E8-S1/S2 wait on the owner's decisions in AI_COACH.md §8.**
 - **E8-S1** Opt-in screen explaining exactly what's sent *(S)*
 - **E8-S2** Chat coach using summary data only *(L)*
 
