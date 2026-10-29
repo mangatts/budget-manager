@@ -4,6 +4,7 @@ import { moreView } from './views/more.js';
 import { homeView } from './views/home.js';
 import { addView, editView } from './views/add.js';
 import { historyView } from './views/history.js';
+import { backupView } from './views/backup.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
 import { initToasts, setStickyToast } from './ui/toast.js';
@@ -19,6 +20,7 @@ const routes = {
   edit: { title: 'Edit', view: editView, tab: 'history' }, // #/edit/<id>, not in the tab bar
   tips: { title: 'Tips', view: () => placeholderView('Tips', 'Smart Coach tips on where to cut back. Coming in Sprint 4.') },
   more: { title: 'More', view: moreView },
+  backup: { title: 'Backups', view: backupView, tab: 'more' }, // not in the tab bar
   design: { title: 'Design reference', view: designView }, // not in the tab bar
 };
 
