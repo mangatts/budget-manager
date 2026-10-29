@@ -4,6 +4,7 @@
 
 import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge, validateDebt } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
+import { STEP_IDS } from './services/insights/nextStep.js';
 import { newId as defaultNewId } from './utils/id.js';
 import { todayLocal } from './utils/dates.js';
 
@@ -190,6 +191,15 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     async setMeta(key, value) {
       await repo.put('meta', { key, value });
       set({ meta: { ...state.meta, [key]: value } });
+    },
+
+    // Next Best Step: skip a step (or bring it back). Returns undo.
+    async setStepSkipped(stepId, skipped) {
+      if (!STEP_IDS.includes(stepId)) return { ok: false, errors: { form: 'That step doesn’t exist.' } };
+      const before = Array.isArray(state.meta.skippedSteps) ? state.meta.skippedSteps : [];
+      const after = skipped ? [...new Set([...before, stepId])] : before.filter((id) => id !== stepId);
+      try { await this.setMeta('skippedSteps', after); } catch { return { ok: false, errors: SAVE_FAILED }; }
+      return { ok: true, undo: async () => { try { await this.setMeta('skippedSteps', before); } catch { throw refuse(SAVE_FAILED.form); } } };
     },
 
     // Take-home pay and savings %, saved together. Returns undo.
