@@ -15,7 +15,14 @@ export class BackupTooLargeError extends Error {}
 export const MIN_PASSPHRASE = 12;
 const MAX_TRANSACTIONS = 200_000;
 const MAX_CATEGORIES = 500;
-const META_KEYS = new Set(['seededCategories', 'lastBackupAt']);
+// Allowed settings in a backup, each with its own check.
+const META_RULES = {
+  seededCategories: (v) => v === 1,
+  lastBackupAt: (v) => Number.isSafeInteger(v) && v > 0,
+  monthlyTakeHomeCents: (v) => v === null || (Number.isSafeInteger(v) && v > 0 && v <= MAX_CENTS),
+  savingsPercent: (v) => Number.isSafeInteger(v) && v >= 0 && v <= 50,
+};
+const META_KEYS = new Set(Object.keys(META_RULES));
 const BUCKETS = new Set(['need', 'want', 'savings', null]);
 
 // A short list of the most common passwords and patterns people reach for.
@@ -104,7 +111,7 @@ export function validatePayload(payload) {
   if (cleanTransactions.includes(null)) return fail('This backup has an entry that isn’t valid, so nothing was restored.');
   if (new Set(cleanTransactions.map((t) => t.id)).size !== cleanTransactions.length) return fail('This backup has a repeated entry, so nothing was restored.');
 
-  const cleanMeta = meta.filter((m) => m && META_KEYS.has(m.key) && isTime(m.value)).map((m) => ({ key: m.key, value: m.value }));
+  const cleanMeta = meta.filter((m) => m && Object.hasOwn(META_RULES, m.key) && META_RULES[m.key](m.value)).map((m) => ({ key: m.key, value: m.value }));
   const exportedAt = isTime(payload.exportedAt) ? payload.exportedAt : null;
   // The categories are already in this backup, so don't add the defaults again after restoring.
   const finalMeta = [

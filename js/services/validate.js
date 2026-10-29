@@ -96,3 +96,25 @@ export function validateCategory(input, { categories, editingId = null }) {
   if (Object.keys(errors).length) return { ok: false, errors };
   return { ok: true, value: { name, icon: raw.icon, type, bucket } };
 }
+
+// ── Money profile (More → Your money) ──
+
+export const DEFAULT_SAVINGS_PERCENT = 20; // the "20" in 50/30/20
+export const MAX_SAVINGS_PERCENT = 50;
+
+// input: { takeHome: "4,500" | "" , savingsPercent: "20" } → { monthlyTakeHomeCents: int | null, savingsPercent: int }
+export function validateProfile(input) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const errors = {};
+  let monthlyTakeHomeCents = null;
+  if (String(raw.takeHome ?? '').trim() !== '') {
+    const amount = parseAmount(raw.takeHome);
+    if (amount.error) errors.takeHome = amount.error;
+    else monthlyTakeHomeCents = amount.cents;
+  }
+  const text = String(raw.savingsPercent ?? '').trim().replace(/%$/, '');
+  const percent = /^\d{1,3}$/.test(text) ? Number(text) : NaN;
+  if (!(percent >= 0 && percent <= MAX_SAVINGS_PERCENT)) errors.savingsPercent = `Enter a whole number from 0 to ${MAX_SAVINGS_PERCENT}`;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, value: { monthlyTakeHomeCents, savingsPercent: percent } };
+}

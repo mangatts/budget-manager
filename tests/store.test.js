@@ -168,3 +168,15 @@ test('setMeta saves and updates state', async () => {
   assert.equal(store.getState().meta.lastBackupAt, 123);
   assert.deepEqual(await repo.get('meta', 'lastBackupAt'), { key: 'lastBackupAt', value: 123 });
 });
+
+test('setProfile saves both settings together, and undo restores them', async () => {
+  const { store, repo } = await setup();
+  const result = await store.setProfile({ takeHome: '4500', savingsPercent: '15' });
+  assert.equal(result.ok, true);
+  assert.equal(store.getState().meta.monthlyTakeHomeCents, 450000);
+  assert.equal((await repo.get('meta', 'savingsPercent')).value, 15);
+  await result.undo();
+  assert.equal(store.getState().meta.monthlyTakeHomeCents, null);
+  assert.equal(store.getState().meta.savingsPercent, undefined);
+  assert.equal((await store.setProfile({ takeHome: '-1', savingsPercent: '20' })).errors.takeHome, 'Enter an amount like 12.50');
+});
