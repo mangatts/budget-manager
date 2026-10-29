@@ -1,0 +1,49 @@
+// Tips: the Smart Coach. Where you could cut back, most valuable first, each with its reasons.
+import { el, clear } from '../utils/dom.js';
+import { formatCents } from '../utils/money.js';
+import { todayLocal } from '../utils/dates.js';
+import { getStore } from '../appStore.js';
+import { coachTips } from '../services/insights/engine.js';
+import { tipCard, disclaimer } from '../ui/tipCard.js';
+
+function render(body, state) {
+  clear(body);
+  const tips = coachTips(state, todayLocal());
+  if (!tips.length) {
+    const few = state.transactions.filter((t) => t.type === 'expense').length < 10;
+    body.append(el('div', { class: 'card', id: 'tips-empty' },
+      el('h2', { class: 'section-title' }, few ? 'Tips are on the way' : 'Nothing stands out right now'),
+      el('p', {}, few
+        ? 'Add at least 10 expenses (about a week or two of everyday spending) and tips about where you could cut back will appear here.'
+        : 'Your spending looks close to typical households and to your usual months. Nice work. Check back as you add more.'),
+      few ? el('a', { class: 'btn btn-primary', href: '#/add' }, '＋ Add an expense') : null,
+    ));
+  } else {
+    const total = tips.filter((t) => t.level).reduce((s, t) => s + t.estimatedMonthlySavingsCents, 0);
+    body.append(
+      el('p', { class: 'lead', id: 'tips-summary' }, `${tips.length} ${tips.length === 1 ? 'idea' : 'ideas'}, up to about ${formatCents(Math.round(total / 100) * 100)} a month. Biggest first.`),
+      el('div', { class: 'section', id: 'tips-list' }, tips.map(tipCard)),
+    );
+  }
+  body.append(disclaimer());
+}
+
+export function tipsView() {
+  const body = el('div', { class: 'section' }, el('p', { class: 'lead' }, 'Loading…'));
+  getStore().then((store) => {
+    render(body, store.getState());
+    const stop = store.subscribe(() => { if (!body.isConnected) return stop(); render(body, store.getState()); });
+  }, () => { clear(body); body.append(el('p', { class: 'field-error', role: 'alert' }, 'This browser can’t save data on this device.')); });
+  return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Tips'), body);
+}
+
+// Home shows the top two (never more than three, so it doesn't overwhelm).
+export function topTips(state, today, count = 2) {
+  const tips = coachTips(state, today).slice(0, count);
+  if (!tips.length) return null;
+  return el('section', { class: 'section', id: 'home-tips', 'aria-labelledby': 'home-tips-title' },
+    el('h2', { class: 'section-title', id: 'home-tips-title' }, 'Where you could cut back'),
+    tips.map(tipCard),
+    el('a', { class: 'btn btn-quiet', href: '#/tips', id: 'all-tips' }, 'See all tips ›'),
+  );
+}

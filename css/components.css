@@ -638,3 +638,8 @@ select.input {
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* ── Coach tips ── */
+.tip h3 {
+  font-size: var(--text-lg);
+}

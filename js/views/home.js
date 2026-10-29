@@ -10,6 +10,7 @@ import { upcomingBills } from '../services/insights/safeToSpend.js';
 import { safeToSpendCard } from '../ui/safeToSpendCard.js';
 import { splitChart } from '../ui/splitChart.js';
 import { billStatusPill } from './bills.js';
+import { topTips } from './tips.js';
 
 // Remembered while the app is open.
 let month = null;
@@ -100,6 +101,8 @@ export function homeView() {
       todaySlot.append(safeToSpendCard(state, today));
       const upcoming = upcomingSection(state, today);
       if (upcoming) todaySlot.append(upcoming);
+      const tips = topTips(state, today);
+      if (tips) todaySlot.append(tips);
       label.textContent = formatMonth(month);
       render(body, state);
     };
