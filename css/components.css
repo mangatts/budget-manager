@@ -427,3 +427,16 @@
 .warning-card {
   border-color: var(--warning);
 }
+
+/* ── Icon picker: small square chips ── */
+.icon-grid .choice > span {
+  min-width: var(--tap);
+  justify-content: center;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-lg);
+}
+
+.icon-grid .choice input:checked + span::before {
+  content: none;
+}
