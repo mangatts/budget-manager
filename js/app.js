@@ -7,6 +7,7 @@ import { historyView } from './views/history.js';
 import { backupView } from './views/backup.js';
 import { categoriesView, categoryView } from './views/categories.js';
 import { wipeView } from './views/wipe.js';
+import { profileView } from './views/profile.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
 import { initToasts, setStickyToast } from './ui/toast.js';
@@ -26,6 +27,7 @@ const routes = {
   categories: { title: 'Categories', view: categoriesView, tab: 'more' },
   category: { title: 'Category', view: categoryView, tab: 'more' }, // #/category/<id> or #/category/new
   wipe: { title: 'Delete everything', view: wipeView, tab: 'more' },
+  profile: { title: 'Your money', view: profileView, tab: 'more' },
   design: { title: 'Design reference', view: designView }, // not in the tab bar
 };
 

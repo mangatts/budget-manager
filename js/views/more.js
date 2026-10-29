@@ -128,6 +128,10 @@ export function moreView() {
       ),
     ),
 
+    el('section', { class: 'section', 'aria-labelledby': 'money-title' },
+      el('h2', { class: 'section-title', id: 'money-title' }, 'Your money'),
+      el('ul', { class: 'list' }, linkRow('#/profile', 'Take-home pay and savings', 'Makes your numbers more accurate', 'profile-link')),
+    ),
     backupsSection(),
     el('section', { class: 'section', 'aria-labelledby': 'cats-title' },
       el('h2', { class: 'section-title', id: 'cats-title' }, 'Categories'),
