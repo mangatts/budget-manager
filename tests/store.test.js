@@ -134,3 +134,37 @@ test('repository only allows known stores', async () => {
   assert.throws(() => repo.getAll('__proto__'), /Unknown store/);
   assert.throws(() => repo.put('users', {}), /Unknown store/);
 });
+
+test('replaceAll swaps everything at once, and undo puts it back', async () => {
+  const { store, repo } = await setup();
+  const { record } = await store.addTransaction(coffee);
+  const before = store.snapshot();
+  const restored = { ...before, transactions: [{ ...record, id: 'restored-1', note: 'From backup' }], meta: [{ key: 'seededCategories', value: 1 }, { key: 'lastBackupAt', value: 42 }] };
+  const result = await store.replaceAll(restored);
+  assert.equal(result.ok, true);
+  assert.deepEqual(store.getState().transactions.map((t) => t.note), ['From backup']);
+  assert.equal(store.getState().meta.lastBackupAt, 42);
+  assert.deepEqual((await repo.getAll('transactions')).map((t) => t.id), ['restored-1']);
+  await result.undo();
+  assert.deepEqual(store.getState().transactions, [record]);
+  assert.deepEqual(await repo.getAll('transactions'), [record]);
+});
+
+test('a failed restore changes nothing', async () => {
+  const adapter = createMemoryAdapter();
+  const { store, repo } = await setup({ adapter });
+  await store.addTransaction(coffee);
+  adapter.replaceAll = async () => { throw new Error('quota'); };
+  const failed = await store.replaceAll({ transactions: [], categories: [], meta: [] });
+  assert.equal(failed.ok, false);
+  assert.match(failed.errors.form, /Couldn’t save/);
+  assert.equal(store.getState().transactions.length, 1);
+  assert.equal((await repo.getAll('transactions')).length, 1);
+});
+
+test('setMeta saves and updates state', async () => {
+  const { store, repo } = await setup();
+  await store.setMeta('lastBackupAt', 123);
+  assert.equal(store.getState().meta.lastBackupAt, 123);
+  assert.deepEqual(await repo.get('meta', 'lastBackupAt'), { key: 'lastBackupAt', value: 123 });
+});

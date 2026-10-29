@@ -48,6 +48,24 @@ function adapter(db) {
       await this.putMany(store, [value]);
       return value;
     },
+    // Restore: clears and refills every store in ONE transaction, so it's all or nothing.
+    async replaceAll(data) {
+      const names = Object.keys(data);
+      const tx = db.transaction(names, 'readwrite');
+      const done = committed(tx);
+      try {
+        for (const name of names) {
+          const store = tx.objectStore(name);
+          store.clear();
+          for (const value of data[name]) store.put(value);
+        }
+      } catch (error) {
+        tx.abort();
+        await done.catch(() => {});
+        throw error;
+      }
+      await done;
+    },
     async delete(store, key) {
       const tx = db.transaction(store, 'readwrite');
       tx.objectStore(store).delete(key);

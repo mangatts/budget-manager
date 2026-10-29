@@ -4,9 +4,10 @@ import { choiceGroup } from '../ui/choiceGroup.js';
 import { readAppliedPrefs, savePref, applyPrefs } from '../services/preferences.js';
 import { installState, promptInstall, requestPersistence, storageStatus } from '../services/pwa.js';
 import { getStore } from '../appStore.js';
+import { lastBackupText } from './backup.js';
+import { backupReminder } from '../ui/backupReminder.js';
 
 const COMING_SOON = [
-  ['Backups', 'Save an encrypted copy of your data. Coming next.'],
   ['Categories', 'Rename, add, or hide categories. Coming soon.'],
   ['Bank statement import', 'Bring in transactions from a CSV file. Sprint 8.'],
 ];
@@ -43,6 +44,26 @@ function installSection() {
   return el('section', { class: 'section', 'aria-labelledby': 'install-title' }, el('h2', { class: 'section-title', id: 'install-title' }, 'Install the app'), body);
 }
 
+function backupsSection() {
+  const status = el('span', { class: 'list-row-sub', id: 'backup-status' }, 'Encrypted with a passphrase you choose');
+  const reminderSlot = el('div', {});
+  getStore().then((store) => {
+    status.textContent = `Last backup: ${lastBackupText(store.getState().meta.lastBackupAt)} \u00b7 encrypted with your passphrase`;
+    const reminder = backupReminder(store.getState());
+    if (reminder) reminderSlot.append(reminder);
+  }, () => {});
+  return el('section', { class: 'section', 'aria-labelledby': 'backups-title' },
+    el('h2', { class: 'section-title', id: 'backups-title' }, 'Backups'),
+    reminderSlot,
+    el('ul', { class: 'list' }, el('li', {},
+      el('a', { class: 'list-row list-row-link', href: '#/backup' },
+        el('span', { class: 'list-row-main' }, el('span', {}, 'Save or restore a backup'), status),
+        el('span', { 'aria-hidden': 'true' }, '\u203a'),
+      ),
+    )),
+  );
+}
+
 function formatBytes(bytes) {
   if (bytes == null) return null;
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -59,7 +80,7 @@ function storageSection() {
     status.append(
       persisted
         ? el('p', {}, el('span', { class: 'pill pill-good' }, '\u2713 Protected'), ' Your browser won\u2019t clean up this data automatically.')
-        : el('p', {}, el('span', { class: 'pill pill-warning' }, '\u26a0 Not protected yet'), ' Install the app to protect it. Backups (coming next) keep a copy safe too.'),
+        : el('p', {}, el('span', { class: 'pill pill-warning' }, '\u26a0 Not protected yet'), ' Install the app to protect it, and keep a backup.'),
       el('p', { class: 'field-hint' }, `${entries} ${entries === 1 ? 'entry' : 'entries'}${formatBytes(info.usage) ? ` \u00b7 ${formatBytes(info.usage)} used` : ''} \u00b7 stored only on this device`),
     );
   });
@@ -101,6 +122,7 @@ export function moreView() {
       ),
     ),
 
+    backupsSection(),
     installSection(),
     storageSection(),
 

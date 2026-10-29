@@ -221,14 +221,15 @@ budget-manager/
 │   │   ├── pwa.js          # service worker, install prompt, storage persistence
 │   │   ├── history.js      # filter/search/group/totals for History
 │   │   ├── categories.js   # defaults, seeded once
-│   │   ├── backup.js
-│   │   ├── crypto.js
+│   │   ├── backup.js       # build, open, and strictly validate backups
+│   │   ├── crypto.js       # AES-256-GCM + PBKDF2 (Web Crypto)
 │   │   ├── validate.js
 │   │   └── migrations.js
 │   ├── ui/
 │   │   └── choiceGroup.js  # shared components built with utils/dom.js
 │   ├── views/
 │   │   ├── design.js       # #/design reference page (hidden route)
+│   │   ├── backup.js       # More → Backups (save / restore)
 │   │   ├── more.js         # More → Display settings
 │   │   ├── home.js
 │   │   ├── addTransaction.js

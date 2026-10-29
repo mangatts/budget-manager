@@ -19,6 +19,14 @@ export function createMemoryAdapter() {
     },
     async put(store, value) { await this.putMany(store, [value]); return value; },
     async delete(store, key) { storeFor(store).delete(key); },
+    async replaceAll(data) {
+      // Build everything first, then swap, so a bad value changes nothing (like IndexedDB).
+      const next = Object.fromEntries(Object.entries(data).map(([name, values]) => {
+        storeFor(name);
+        return [name, new Map(values.map((v) => [v[KEY_PATHS[name]], structuredClone(v)]))];
+      }));
+      Object.assign(stores, next);
+    },
     close() {},
   };
 }

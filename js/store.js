@@ -12,8 +12,15 @@ const SAVE_FAILED = { form: 'Couldn’t save on this device. Check that the brow
 // Newest day first; within a day, most recently added first.
 const byNewest = (a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1);
 
+// Stored rows → app state (sorted lists, meta as a key → value object).
+const shape = ({ categories, transactions, meta }) => ({
+  categories: [...categories].sort((a, b) => a.order - b.order),
+  transactions: [...transactions].sort(byNewest),
+  meta: Object.fromEntries(meta.map((m) => [m.key, m.value])),
+});
+
 export function createStore({ repo, now = Date.now, newId = defaultNewId, today = todayLocal }) {
-  let state = { ready: false, categories: [], transactions: [] };
+  let state = { ready: false, categories: [], transactions: [], meta: {} };
   const listeners = new Set();
 
   const set = (changes) => {
@@ -43,8 +50,8 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
 
     async init() {
       await seedCategoriesOnce(repo);
-      const [categories, transactions] = await Promise.all([repo.getAll('categories'), repo.getAll('transactions')]);
-      set({ ready: true, categories: categories.sort((a, b) => a.order - b.order), transactions: transactions.sort(byNewest) });
+      const [categories, transactions, meta] = await Promise.all([repo.getAll('categories'), repo.getAll('transactions'), repo.getAll('meta')]);
+      set({ ready: true, ...shape({ categories, transactions, meta }) });
     },
 
     async addTransaction(input) {
@@ -72,6 +79,38 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         return { ok: false, errors: SAVE_FAILED };
       }
       return { ok: true, record, undo: () => restore(before) };
+    },
+
+    // Everything on this device, in the shape stored (for backups and undoing a restore).
+    snapshot() {
+      return {
+        transactions: state.transactions.map((t) => ({ ...t })),
+        categories: state.categories.map((c) => ({ ...c })),
+        meta: Object.entries(state.meta).map(([key, value]) => ({ key, value })),
+      };
+    },
+
+    async setMeta(key, value) {
+      await repo.put('meta', { key, value });
+      set({ meta: { ...state.meta, [key]: value } });
+    },
+
+    // Replaces everything (restore). Data must already be validated (services/backup.js).
+    async replaceAll(data) {
+      const before = this.snapshot();
+      try {
+        await repo.replaceAll(data);
+      } catch {
+        return { ok: false, errors: SAVE_FAILED };
+      }
+      set(shape(data));
+      return {
+        ok: true,
+        undo: async () => {
+          await repo.replaceAll(before);
+          set(shape(before));
+        },
+      };
     },
 
     async deleteTransaction(id) {

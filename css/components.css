@@ -408,3 +408,22 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+
+/* ── Checkbox with a big tap area ── */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: 1.4em;
+  height: 1.4em;
+  accent-color: var(--accent);
+}
+
+.warning-card {
+  border-color: var(--warning);
+}
