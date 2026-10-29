@@ -167,7 +167,9 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
   - ✅ Done: Your money adds emergency savings (0 allowed, blank = skipped) and 401(k) match; new More → Debts (name, balance, APR, minimum; highest rate first, Undo); database v4 `debts`; backups carry both.
   - Not yet: savings goals (e.g. "$3,000 for a car by June"). Moved to E12-S1, the first story that needs one.
 - **E11-S2** As a user, I want to see which money step I'm on and one clear next action. *(L, split by step)*
+  - ✅ Done: 7 steps worked out from your data (spend < earn → $1,000 starter fund → 401(k) match → debts > 8% APR → 3 months of essentials → save 15% → goals). Home shows the one current step with its action, progress, Skip (Undo), and "Why?"; More detail at `#/steps`. Steps missing info ask one question.
 - **E11-S3** As a user, I want a monthly Money Checkup score with 🟢🟡🔴 explanations. *(M)*
+  - ✅ Done: last full month, 5 signals (spending vs income, savings rate, emergency months, housing share, debt payments + high-interest debts); 🟢 20 / 🟡 10 / 🔴 0, scaled over the signals we can measure; each with "Why?" and source. Linked from Home.
 
 ### E12: What-If
 - **E12-S1** As a user, I want to see how cutting a category changes when I reach a goal. *(M)*
@@ -193,7 +195,7 @@ Basic first, then layers (see PRODUCT.md §3).
 | **3** | Know where you stand | E3-S1, S2, E9-S1 → S3, E4-S1 → S3 | Home shows **Safe to Spend Today** + 50/30/20 split |
 | **4** | Know what to cut | E4-S4, S5, E3-S3, E5-S1 → S3 | Smart Coach tips with "Why?" |
 | **5** | Know what to cut | E5-S4 → S6, E10-S1 → S3 | First **Cut Plan** challenge, month-end win |
-| **6** | Know what's next | E11-S1 → S3 | **Next Best Step** + Money Checkup |
+| **6** ✅ | Know what's next | E11-S1 → S3 | **Next Best Step** + Money Checkup |
 | **7** | See the future | E12-S1 → S3 | What-If sliders and debt payoff plan |
 | **8–9** | Less typing | E7-S1 → S6 | Import a real statement and categorize it |
 | **10** | Smarter | E6-S1 → S3 | Feedback changes which tips show |

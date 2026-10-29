@@ -140,6 +140,10 @@ export function validateProfile(input) {
   return { ok: true, value: { monthlyTakeHomeCents, savingsPercent: percent, ...(emergencyFundCents !== undefined && { emergencyFundCents }), ...(employerMatch !== undefined && { employerMatch }) } };
 }
 
+// ── Next Best Step ──
+
+export const STEP_IDS = Object.freeze(['spend-less', 'starter-fund', 'match', 'high-interest', 'full-fund', 'save-15', 'goals']);
+
 // ── Debts (Next Best Step) ──
 
 export const MAX_APR_BPS = 9999; // 99.99%

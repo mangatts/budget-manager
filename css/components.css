@@ -674,3 +674,20 @@ select.input {
 .cat-row:focus-visible .meter-tip {
   opacity: 1;
 }
+
+/* ── Next Best Step ── */
+.next-step h3 {
+  font-size: var(--text-lg);
+}
+.step-row .list-row-main {
+  gap: var(--space-1);
+}
+.step-row[data-status="current"] {
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  padding-inline: var(--space-2);
+  font-weight: var(--weight-bold);
+}
+.step-row[data-status="done"] .row-icon {
+  color: var(--accent);
+}
