@@ -62,3 +62,37 @@ function validCents(cents) {
   if (cents > MAX_CENTS) return { error: 'Amounts can’t be more than $1,000,000' };
   return { cents };
 }
+
+// ── Categories ──
+
+export const MAX_CATEGORY_NAME = 30;
+export const BUCKETS = Object.freeze(['need', 'want', 'savings']);
+// Icons people can pick for their own categories (the defaults use these too).
+export const CATEGORY_ICONS = Object.freeze(['🏠', '💡', '🛒', '🚌', '⛽', '🩺', '💳', '🍽️', '🛍️', '📺', '🎟️', '🧴', '🎁', '🏦', '📉', '📦', '💼', '🧰', '🎉', '↩️', '➕', '🐾', '👶', '🎓', '✈️', '🏋️', '📱', '🚗', '☕', '🧾']);
+
+// input: { name, icon, type, bucket } · `editingId` lets a category keep its own name.
+export function validateCategory(input, { categories, editingId = null }) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const errors = {};
+  const name = cleanNote(raw.name);
+  const length = [...name].length;
+  if (!length) errors.name = 'Give it a name';
+  else if (length > MAX_CATEGORY_NAME) errors.name = `Names can be up to ${MAX_CATEGORY_NAME} characters. Shorten it by ${length - MAX_CATEGORY_NAME}.`;
+
+  const type = TYPES.includes(raw.type) ? raw.type : null;
+  if (!type) errors.type = 'Choose money in or money out';
+
+  const key = name.toLocaleLowerCase('en-US');
+  if (!errors.name && type && categories.some((c) => c.type === type && c.id !== editingId && c.name.toLocaleLowerCase('en-US') === key)) {
+    errors.name = `You already have a “${name}” category.`;
+  }
+
+  if (!CATEGORY_ICONS.includes(raw.icon)) errors.icon = 'Pick an icon';
+
+  // Money out needs a 50/30/20 group for the coach; money in doesn't have one.
+  const bucket = type === 'expense' ? (BUCKETS.includes(raw.bucket) ? raw.bucket : null) : null;
+  if (type === 'expense' && !bucket) errors.bucket = 'Choose Need, Want, or Savings';
+
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, value: { name, icon: raw.icon, type, bucket } };
+}

@@ -8,9 +8,15 @@ import { lastBackupText } from './backup.js';
 import { backupReminder } from '../ui/backupReminder.js';
 
 const COMING_SOON = [
-  ['Categories', 'Rename, add, or hide categories. Coming soon.'],
   ['Bank statement import', 'Bring in transactions from a CSV file. Sprint 8.'],
 ];
+
+const linkRow = (href, title, detail, id) => el('li', {},
+  el('a', { class: 'list-row list-row-link', href, id },
+    el('span', { class: 'list-row-main' }, el('span', {}, title), el('span', { class: 'list-row-sub' }, detail)),
+    el('span', { 'aria-hidden': 'true' }, '\u203a'),
+  ),
+);
 
 function installSection() {
   const body = el('div', { class: 'section', id: 'install-body' });
@@ -123,8 +129,16 @@ export function moreView() {
     ),
 
     backupsSection(),
+    el('section', { class: 'section', 'aria-labelledby': 'cats-title' },
+      el('h2', { class: 'section-title', id: 'cats-title' }, 'Categories'),
+      el('ul', { class: 'list' }, linkRow('#/categories', 'Manage categories', 'Rename, add, hide, or delete', 'manage-categories')),
+    ),
     installSection(),
     storageSection(),
+    el('section', { class: 'section', 'aria-labelledby': 'danger-title' },
+      el('h2', { class: 'section-title', id: 'danger-title' }, 'Start over'),
+      el('ul', { class: 'list' }, linkRow('#/wipe', 'Delete everything on this device', 'Offers a backup first', 'wipe-link')),
+    ),
 
     el('section', { class: 'section', 'aria-labelledby': 'soon-title' },
       el('h2', { class: 'section-title', id: 'soon-title' }, 'Coming soon'),

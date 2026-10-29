@@ -27,8 +27,9 @@ function render({ message, action }) {
     try {
       const done = await action.run();
       showToast({ message: done ?? 'Done', duration: 2500 });
-    } catch {
-      showToast({ message: 'That didn’t work. Please try again.', action }); // keep the button so they can retry
+    } catch (error) {
+      // Keep the button so they can retry; explain why when we know.
+      showToast({ message: error?.userMessage ?? 'That didn’t work. Please try again.', action });
     }
   });
 }
