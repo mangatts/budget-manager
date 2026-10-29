@@ -176,7 +176,7 @@ test('setProfile saves both settings together, and undo restores them', async ()
   assert.equal(store.getState().meta.monthlyTakeHomeCents, 450000);
   assert.equal((await repo.get('meta', 'savingsPercent')).value, 15);
   await result.undo();
-  assert.equal(store.getState().meta.monthlyTakeHomeCents, null);
+  assert.equal(store.getState().meta.monthlyTakeHomeCents, undefined); // back to "never set"
   assert.equal(store.getState().meta.savingsPercent, undefined);
   assert.equal((await store.setProfile({ takeHome: '-1', savingsPercent: '20' })).errors.takeHome, 'Enter an amount like 12.50');
 });
