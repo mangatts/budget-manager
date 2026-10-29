@@ -75,7 +75,9 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
   - ✅ Done: 21 defaults (16 money out with needs/wants/savings bucket, 5 money in), seeded once.
 - **E1-S3** As a user, I want to add an expense in under 5 seconds. *(M)*
   - AC: keypad opens first; category buttons; date defaults to today; validation errors in plain words.
+  - ✅ Done: Amount focused on open, most-used categories first, 3-tap fast path, Undo toast, keyboard-only flow.
 - **E1-S4** As a user, I want to record income so the app knows what I earn. *(S)*
+  - ✅ Done: Money in/out toggle switches categories; stays selected for the next entry.
 - **E1-S5** As a user, I want to see, search, edit, and delete past transactions, with undo. *(M)*
 - **E1-S6** As a user, I want to rename, add, or archive categories. *(S)*
 
