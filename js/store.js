@@ -2,7 +2,7 @@
 // then announced to subscribers. Changes return an undo() so the UI can offer "Undo" instead of
 // "Are you sure?" dialogs.
 
-import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge, validateDebt, STEP_IDS } from './services/validate.js';
+import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge, validateDebt, validateGoal, STEP_IDS } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
 import { newId as defaultNewId } from './utils/id.js';
 import { todayLocal } from './utils/dates.js';
@@ -13,21 +13,23 @@ const SAVE_FAILED = { form: 'Couldn’t save on this device. Check that the brow
 const byNewest = (a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1);
 
 // Stored rows → app state (sorted lists, meta as a key → value object).
-const shape = ({ categories, transactions, meta, bills = [], challenges = [], debts = [] }) => ({
+const shape = ({ categories, transactions, meta, bills = [], challenges = [], debts = [], goals = [] }) => ({
   categories: [...categories].sort((a, b) => a.order - b.order),
   transactions: [...transactions].sort(byNewest),
   meta: Object.fromEntries(meta.map((m) => [m.key, m.value])),
   bills: [...bills].sort(byDueDay),
   challenges: [...challenges].sort((a, b) => b.createdAt - a.createdAt),
   debts: [...debts].sort(byRate),
+  goals: [...goals].sort(byCreated),
 });
 
 const byDueDay = (a, b) => a.dayOfMonth - b.dayOfMonth || a.name.localeCompare(b.name);
 const byRate = (a, b) => b.aprBps - a.aprBps || a.name.localeCompare(b.name); // highest interest first
-const SORTS = { debts: byRate };
+const byCreated = (a, b) => a.createdAt - b.createdAt;
+const SORTS = { debts: byRate, goals: byCreated };
 
 export function createStore({ repo, now = Date.now, newId = defaultNewId, today = todayLocal }) {
-  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [], debts: [] };
+  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [], debts: [], goals: [] };
   const listeners = new Set();
 
   const set = (changes) => {
@@ -102,7 +104,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     return { ok: true, record, undo };
   }
 
-  // Generic save-with-undo for simple stores (debts).
+  // Generic save-with-undo for simple stores (debts, goals).
   async function saveRecord(storeName, record, before) {
     try { await repo.put(storeName, record); } catch { return { ok: false, errors: SAVE_FAILED }; }
     set({ [storeName]: [...state[storeName].filter((r) => r.id !== record.id), record].sort(SORTS[storeName]) });
@@ -144,8 +146,8 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
 
     async init() {
       await seedCategoriesOnce(repo);
-      const [categories, transactions, meta, bills, challenges, debts] = await Promise.all(['categories', 'transactions', 'meta', 'bills', 'challenges', 'debts'].map((name) => repo.getAll(name)));
-      set({ ready: true, ...shape({ categories, transactions, meta, bills, challenges, debts }) });
+      const [categories, transactions, meta, bills, challenges, debts, goals] = await Promise.all(['categories', 'transactions', 'meta', 'bills', 'challenges', 'debts', 'goals'].map((name) => repo.getAll(name)));
+      set({ ready: true, ...shape({ categories, transactions, meta, bills, challenges, debts, goals }) });
     },
 
     async addTransaction(input) {
@@ -184,6 +186,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         bills: state.bills.map((b) => ({ ...b })),
         challenges: state.challenges.map((c) => ({ ...c })),
         debts: state.debts.map((d) => ({ ...d })),
+        goals: state.goals.map((g) => ({ ...g })),
       };
     },
 
@@ -231,7 +234,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     // Replaces everything (restore). Data must already be validated (services/backup.js).
     async replaceAll(data) {
       const before = this.snapshot();
-      data = { bills: [], challenges: [], debts: [], ...data }; // older backups lack newer stores
+      data = { bills: [], challenges: [], debts: [], goals: [], ...data }; // older backups lack newer stores
       try {
         await repo.replaceAll(data);
       } catch {
@@ -309,6 +312,31 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       const result = validateBill(input, { categories: state.categories, keepCategoryId: before.categoryId });
       if (!result.ok) return result;
       return saveBill({ ...before, ...result.value, updatedAt: now() }, before);
+    },
+
+    // ── Savings goals ── (each returns undo)
+
+    async addGoal(input) {
+      const result = validateGoal(input);
+      if (!result.ok) return result;
+      const time = now();
+      return saveRecord('goals', { id: newId(), ...result.value, createdAt: time, updatedAt: time }, null);
+    },
+
+    async updateGoal(id, input) {
+      const before = state.goals.find((g) => g.id === id);
+      if (!before) return { ok: false, errors: { form: 'This goal no longer exists.' } };
+      const result = validateGoal(input);
+      if (!result.ok) return result;
+      return saveRecord('goals', { ...before, ...result.value, updatedAt: now() }, before);
+    },
+
+    async deleteGoal(id) {
+      const before = state.goals.find((g) => g.id === id);
+      if (!before) return { ok: false, errors: { form: 'This goal no longer exists.' } };
+      try { await repo.delete('goals', id); } catch { return { ok: false, errors: SAVE_FAILED }; }
+      set({ goals: state.goals.filter((g) => g.id !== id) });
+      return { ok: true, undo: async () => orThrow(await saveRecord('goals', before, null)) };
     },
 
     // ── Debts ── (each returns undo)

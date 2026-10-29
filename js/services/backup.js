@@ -42,12 +42,12 @@ export function checkPassphrase(passphrase, confirm) {
 
 export const backupFileName = (date) => `budget-manager-backup-${date}.bmbackup`;
 
-export function buildPayload({ transactions, categories, meta, bills = [], challenges = [], debts = [] }, now = Date.now()) {
+export function buildPayload({ transactions, categories, meta, bills = [], challenges = [], debts = [], goals = [] }, now = Date.now()) {
   return {
     app: APP_ID,
     schemaVersion: MIGRATIONS.length,
     exportedAt: now,
-    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills, challenges, debts },
+    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills, challenges, debts, goals },
   };
 }
 
@@ -130,6 +130,16 @@ function cleanDebt(d) {
   return { id: d.id, name, balanceCents: d.balanceCents, aprBps: d.aprBps, minPaymentCents: d.minPaymentCents, createdAt: d.createdAt, updatedAt: d.updatedAt };
 }
 
+function cleanGoal(g) {
+  if (!g || typeof g !== 'object') return null;
+  const name = typeof g.name === 'string' ? cleanNote(g.name) : '';
+  const cents = (v, min) => Number.isSafeInteger(v) && v >= min && v <= MAX_CENTS;
+  const ok = isUuid(g.id) && isText(name, 40) && cents(g.targetCents, 1) && cents(g.savedCents, 0) && cents(g.monthlyCents, 0)
+    && isTime(g.createdAt) && isTime(g.updatedAt);
+  if (!ok) return null;
+  return { id: g.id, name, targetCents: g.targetCents, savedCents: g.savedCents, monthlyCents: g.monthlyCents, createdAt: g.createdAt, updatedAt: g.updatedAt };
+}
+
 // Returns { ok: true, data, summary } or { ok: false, error } — never a partial result.
 export function validatePayload(payload) {
   const fail = (error) => ({ ok: false, error });
@@ -147,6 +157,12 @@ export function validatePayload(payload) {
   const cleanDebts = debts.map(cleanDebt);
   if (cleanDebts.includes(null)) return fail('This backup has a debt that isn\u2019t valid, so nothing was restored.');
   if (new Set(cleanDebts.map((d) => d.id)).size !== cleanDebts.length) return fail('This backup has a repeated debt, so nothing was restored.');
+  // Goals arrived in version 5.
+  const goals = payload.schemaVersion >= 5 ? payload.data?.goals : [];
+  if (!Array.isArray(goals) || goals.length > 100) return fail('This backup is damaged and can\u2019t be opened.');
+  const cleanGoals = goals.map(cleanGoal);
+  if (cleanGoals.includes(null)) return fail('This backup has a goal that isn\u2019t valid, so nothing was restored.');
+  if (new Set(cleanGoals.map((g) => g.id)).size !== cleanGoals.length) return fail('This backup has a repeated goal, so nothing was restored.');
   if (!Array.isArray(challenges) || challenges.length > 2000) return fail('This backup is damaged and can\u2019t be opened.');
   if (!Array.isArray(transactions) || !Array.isArray(categories) || !Array.isArray(meta) || !Array.isArray(bills)) return fail('This backup is damaged and can’t be opened.');
   if (bills.length > 500) return fail('This backup is too large to restore.');
@@ -182,7 +198,7 @@ export function validatePayload(payload) {
   const dates = cleanTransactions.map((t) => t.date).sort();
   return {
     ok: true,
-    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges, debts: cleanDebts },
+    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges, debts: cleanDebts, goals: cleanGoals },
     summary: { entries: cleanTransactions.length, bills: cleanBills.length, firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null, exportedAt },
   };
 }

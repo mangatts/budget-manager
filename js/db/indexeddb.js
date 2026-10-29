@@ -26,6 +26,10 @@ export const MIGRATIONS = [
   (db) => {
     db.createObjectStore('debts', { keyPath: 'id' });
   },
+  // v5: savings goals for What-If (Sprint 7)
+  (db) => {
+    db.createObjectStore('goals', { keyPath: 'id' });
+  },
 ];
 
 const request = (req) => new Promise((resolve, reject) => {
