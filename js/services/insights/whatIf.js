@@ -77,28 +77,25 @@ export function growth(monthlyCents, years, rateBps = GROWTH_RATE_BPS) {
   return { valueCents, putInCents, growthCents: valueCents - putInCents, rateBps, years };
 }
 
-// "June 2028": the month `months` from `fromMonth` ("2026-10").
-export function monthAfter(fromMonth, months) {
-  const [y, m] = fromMonth.split('-').map(Number);
-  const total = y * 12 + (m - 1) + months;
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
-}
+// "2028-06": the month `months` after `fromMonth` ("2026-10").
+export const monthAfter = (fromMonth, months) => shiftMonth(fromMonth, months);
 
 // Nice-to-have categories you could cut, with your usual month: the average of the last 1–3 complete
-// months that have spending. Biggest first.
-export function cuttableCategories({ transactions, categories }, today) {
+// months that have spending. Like Cut Plan, skips hidden categories and ones with an active bill. Biggest first.
+export function cuttableCategories({ transactions, categories, bills = [] }, today) {
   const month = monthKey(today);
-  const months = [1, 2, 3].map((n) => shiftMonth(month, -n))
-    .filter((m) => inMonth(transactions, m).some((t) => t.type === 'expense'));
-  if (!months.length) return [];
-  const wants = new Map(categories.filter((c) => c.type === 'expense' && c.bucket === 'want').map((c) => [c.id, c]));
+  const byMonth = [1, 2, 3].map((n) => inMonth(transactions, shiftMonth(month, -n)))
+    .filter((entries) => entries.some((t) => t.type === 'expense'));
+  if (!byMonth.length) return [];
+  const billed = new Set(bills.filter((b) => b.active).map((b) => b.categoryId));
+  const wants = new Map(categories.filter((c) => c.type === 'expense' && c.bucket === 'want' && !c.archived && !billed.has(c.id)).map((c) => [c.id, c]));
   const totals = new Map();
-  for (const m of months) {
-    for (const t of inMonth(transactions, m)) {
+  for (const entries of byMonth) {
+    for (const t of entries) {
       if (t.type === 'expense' && wants.has(t.categoryId)) totals.set(t.categoryId, (totals.get(t.categoryId) ?? 0) + t.amountCents);
     }
   }
-  return [...totals].map(([id, cents]) => ({ id, name: wants.get(id).name, icon: wants.get(id).icon, usualCents: Math.round(cents / months.length) }))
+  return [...totals].map(([id, cents]) => ({ id, name: wants.get(id).name, icon: wants.get(id).icon, usualCents: Math.round(cents / byMonth.length) }))
     .filter((c) => c.usualCents >= 1000)
     .sort((a, b) => b.usualCents - a.usualCents || a.name.localeCompare(b.name));
 }

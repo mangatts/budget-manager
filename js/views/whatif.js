@@ -50,6 +50,7 @@ function goalCard(state, today) {
     else if (cut === 0) out.textContent = r.now === null ? `At your current pace you won’t reach ${goal.name}. Move the slider to see what a cut does.` : `At ${dollars(goal.monthlyCents)} a month, you’ll reach ${goal.name} in ${months(r.now)} (${when(r.now, today)}).`;
     else if (r.withCut === null) out.textContent = `${from}: still more than 50 years. Try a bigger change.`;
     else if (r.now === null) out.textContent = `${from} and put it toward ${goal.name}: you’ll reach it in ${months(r.withCut)} (${when(r.withCut, today)}).`;
+    else if (r.sooner === 0) out.textContent = `${from}: still ${months(r.now)} to reach ${goal.name}, but with less left to save in the last month. Try a bit more.`;
     else out.textContent = `${from} and put it toward ${goal.name}: reach it in ${months(r.withCut)} (${when(r.withCut, today)}) instead of ${months(r.now)}. That’s ${months(r.sooner)} sooner.`;
   };
   const drawSlider = () => {
@@ -90,7 +91,7 @@ function debtCard(state, today) {
     const free = `debt-free in ${months(c.plan.months)} (${when(c.plan.months, today)}), paying ${formatCents(c.plan.interestCents)} in interest`;
     if (!extra) out.textContent = `Paying the minimums only: ${free}.`;
     else if (c.base.months === null) out.textContent = `Paying ${dollars(extra)} extra a month: ${free}. With minimums alone, you’d never finish.`;
-    else out.textContent = `Paying ${dollars(extra)} extra a month: ${free}. That’s ${months(c.monthsSooner)} sooner, and ${formatCents(c.interestSavedCents)} less interest.`;
+    else out.textContent = `Paying ${dollars(extra)} extra a month: ${free}. ${c.monthsSooner ? `That’s ${months(c.monthsSooner)} sooner, and` : 'Same finish month, but'} ${formatCents(c.interestSavedCents)} less interest.`;
     order.append(...c.plan.order.map((o) => el('li', { class: 'list-row' }, el('span', {}, o.name), el('span', { class: 'list-row-sub' }, `paid off ${when(o.month, today)}`))));
   };
   const s = slider({ id: 'whatif-extra', label: 'Extra each month', min: 0, max: 100000, step: 2500, value: 5000, format: dollars, onInput: update });
@@ -106,7 +107,9 @@ function growthCard() {
   let years = 20;
   const update = () => {
     const g = growth(monthly, years);
-    out.textContent = `${dollars(monthly)} a month for ${years} years could grow to about ${dollars(Math.round(g.valueCents / 10000) * 10000)}. You’d put in ${dollars(g.putInCents)}; growth adds about ${dollars(Math.round(g.growthCents / 10000) * 10000)}.`;
+    // Round the total to $100, and show growth as total − what you put in, so the numbers add up.
+    const total = Math.max(g.putInCents, Math.round(g.valueCents / 10000) * 10000);
+    out.textContent = `${dollars(monthly)} a month for ${years} ${years === 1 ? 'year' : 'years'} could grow to about ${dollars(total)}. You’d put in ${dollars(g.putInCents)}; growth adds about ${dollars(total - g.putInCents)}.`;
   };
   const a = slider({ id: 'whatif-monthly', label: 'Save each month', min: 2500, max: 200000, step: 2500, value: monthly, format: dollars, onInput: (v) => { monthly = v; update(); } });
   const b = slider({ id: 'whatif-years', label: 'For', min: 1, max: 40, step: 1, value: years, format: (v) => `${v} ${v === 1 ? 'year' : 'years'}`, onInput: (v) => { years = v; update(); } });
@@ -118,14 +121,24 @@ function growthCard() {
 export function whatIfView() {
   const body = el('div', { class: 'section' }, el('p', { class: 'lead' }, 'Loading…'));
   getStore().then((store) => {
-    // Drawn once per visit, so sliders aren't reset while you use them.
-    const state = store.getState();
-    const today = todayLocal();
-    clear(body);
-    body.append(
-      el('p', { class: 'lead' }, 'Move the sliders to see how small changes add up. Nothing here changes your data.'),
-      goalCard(state, today), debtCard(state, today), growthCard(),
-    );
+    // Sliders only change this screen, so it redraws only when your goals, debts, or entries change (e.g. Undo).
+    const draw = () => {
+      const state = store.getState();
+      const today = todayLocal();
+      clear(body);
+      body.append(
+        el('p', { class: 'lead' }, 'Move the sliders to see how small changes add up. Nothing here changes your data.'),
+        goalCard(state, today), debtCard(state, today), growthCard(),
+      );
+    };
+    draw();
+    let seen = store.getState();
+    const stop = store.subscribe(() => {
+      if (!body.isConnected) return stop();
+      const s = store.getState();
+      if (s.goals !== seen.goals || s.debts !== seen.debts || s.transactions !== seen.transactions) draw();
+      seen = s;
+    });
   }, () => { clear(body); body.append(el('p', { class: 'field-error', role: 'alert' }, 'This browser can’t save data on this device.')); });
   return el('div', { class: 'screen' }, el('a', { class: 'btn btn-quiet back-link', href: '#/more' }, '‹ More'), el('h1', { tabindex: '-1' }, 'What if…'), body);
 }

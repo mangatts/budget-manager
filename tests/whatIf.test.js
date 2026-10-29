@@ -68,3 +68,13 @@ test('cuttableCategories: wants only, usual month averaged, biggest first', asyn
   assert.deepEqual(cuttableCategories({ transactions, categories: DEFAULT_CATEGORIES }, '2026-10-28'), [{ id: 'c-dining', name: 'Dining Out', icon: '🍽️', usualCents: 25000 }]);
   assert.deepEqual(cuttableCategories({ transactions: [], categories: DEFAULT_CATEGORIES }, '2026-10-28'), []);
 });
+
+test('cuttableCategories skips hidden categories and ones with an active bill (like Cut Plan)', async () => {
+  const { cuttableCategories } = await import('../js/services/insights/whatIf.js');
+  const { DEFAULT_CATEGORIES } = await import('../js/services/categories.js');
+  const tx = (categoryId, date) => ({ id: categoryId + date, type: 'expense', amountCents: 5000, categoryId, date });
+  const transactions = ['c-dining', 'c-shopping', 'c-subscriptions'].map((c) => tx(c, '2026-09-10'));
+  const categories = DEFAULT_CATEGORIES.map((c) => (c.id === 'c-shopping' ? { ...c, archived: true } : c));
+  const bills = [{ categoryId: 'c-subscriptions', active: true }];
+  assert.deepEqual(cuttableCategories({ transactions, categories, bills }, '2026-10-28').map((c) => c.id), ['c-dining']);
+});

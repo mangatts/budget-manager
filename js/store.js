@@ -25,6 +25,9 @@ const shape = ({ categories, transactions, meta, bills = [], challenges = [], de
 
 const byDueDay = (a, b) => a.dayOfMonth - b.dayOfMonth || a.name.localeCompare(b.name);
 const byRate = (a, b) => b.aprBps - a.aprBps || a.name.localeCompare(b.name); // highest interest first
+// Backups accept up to this many (services/backup.js), so the app never makes more.
+const MAX_GOALS = 100;
+const MAX_DEBTS = 100;
 const byCreated = (a, b) => a.createdAt - b.createdAt;
 const SORTS = { debts: byRate, goals: byCreated };
 
@@ -317,6 +320,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     // ── Savings goals ── (each returns undo)
 
     async addGoal(input) {
+      if (state.goals.length >= MAX_GOALS) return { ok: false, errors: { form: `You can have up to ${MAX_GOALS} goals.` } };
       const result = validateGoal(input);
       if (!result.ok) return result;
       const time = now();
@@ -342,6 +346,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     // ── Debts ── (each returns undo)
 
     async addDebt(input) {
+      if (state.debts.length >= MAX_DEBTS) return { ok: false, errors: { form: `You can have up to ${MAX_DEBTS} debts.` } };
       const result = validateDebt(input);
       if (!result.ok) return result;
       const time = now();

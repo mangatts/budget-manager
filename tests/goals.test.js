@@ -63,3 +63,10 @@ test('goalEta: a date, already reached, or why there’s no date', () => {
   assert.equal(goalEta(goal({ savedCents: 300000 }), '2026-10-28'), 'Reached. Nice work!');
   assert.equal(goalEta(goal({ monthlyCents: 0 }), '2026-10-28'), 'Add a monthly amount to see when you’ll get there.');
 });
+
+test('no more goals than a backup can restore', async () => {
+  const store = await setup();
+  for (let i = 0; i < 100; i++) await store.addGoal({ name: `Goal ${i}`, target: '10' });
+  assert.match((await store.addGoal(car)).errors.form, /up to 100 goals/);
+  assert.equal(validatePayload(buildPayload({ ...state(), goals: store.snapshot().goals.map((g, i) => ({ ...g, id: `3f6c1a2e-9b7d-4c1e-8a2b-${String(i).padStart(12, '0')}` })) }, 9)).ok, true);
+});
