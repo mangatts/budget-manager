@@ -13,5 +13,6 @@ export function createRepository(adapter) {
     put: (store, value) => { check(store); return adapter.put(store, value); },
     putMany: (store, values) => { check(store); return adapter.putMany(store, values); },
     delete: (store, key) => { check(store); return adapter.delete(store, key); },
+    replaceAll: (data) => { Object.keys(data).forEach(check); return adapter.replaceAll(data); },
   };
 }
