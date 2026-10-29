@@ -31,6 +31,7 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 | Over-collection | Storing full account numbers from statements | Data minimization + masking |
 | Stale or poisoned cache | An old service worker serving bad code | Versioned SW, same-origin only, update flow |
 | Secrets in repo | An API key committed by accident | No secrets in the client + GitHub secret scanning |
+| Optional AI coach (not built) | Key theft, over-sharing, made-up numbers | Designed and reviewed in [AI_COACH.md](AI_COACH.md) §5 before any code |
 
 ---
 
