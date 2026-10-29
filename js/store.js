@@ -19,10 +19,12 @@ const shape = ({ categories, transactions, meta, bills = [], challenges = [], de
   meta: Object.fromEntries(meta.map((m) => [m.key, m.value])),
   bills: [...bills].sort(byDueDay),
   challenges: [...challenges].sort((a, b) => b.createdAt - a.createdAt),
-  debts: [...debts].sort((a, b) => b.aprBps - a.aprBps || a.name.localeCompare(b.name)),
+  debts: [...debts].sort(byRate),
 });
 
 const byDueDay = (a, b) => a.dayOfMonth - b.dayOfMonth || a.name.localeCompare(b.name);
+const byRate = (a, b) => b.aprBps - a.aprBps || a.name.localeCompare(b.name); // highest interest first
+const SORTS = { debts: byRate };
 
 export function createStore({ repo, now = Date.now, newId = defaultNewId, today = todayLocal }) {
   let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [], debts: [] };
@@ -103,8 +105,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
   // Generic save-with-undo for simple stores (debts).
   async function saveRecord(storeName, record, before) {
     try { await repo.put(storeName, record); } catch { return { ok: false, errors: SAVE_FAILED }; }
-    const resort = (list) => shape({ ...state, meta: [], [storeName]: list })[storeName];
-    set({ [storeName]: resort([...state[storeName].filter((r) => r.id !== record.id), record]) });
+    set({ [storeName]: [...state[storeName].filter((r) => r.id !== record.id), record].sort(SORTS[storeName]) });
     const undo = async () => {
       if (before) return orThrow(await saveRecord(storeName, before, null));
       try { await repo.delete(storeName, record.id); } catch { throw refuse(SAVE_FAILED.form); }

@@ -148,7 +148,7 @@ export const MAX_APR_BPS = 9999; // 99.99%
 export function parseApr(input) {
   const text = String(input ?? '').trim().replace(/%$/, '').trim();
   const match = /^(\d{1,2})(?:\.(\d{1,2}))?$/.exec(text);
-  if (!match) return { error: 'Enter the interest rate, like 24.99' };
+  if (!match) return { error: /^\d{3,}(\.\d*)?$/.test(text) ? 'Rates can be up to 99.99%' : 'Enter the interest rate, like 24.99' };
   return { bps: Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0')) };
 }
 
@@ -160,7 +160,7 @@ export function validateDebt(input) {
   if (!name) errors.name = 'Give it a name, like Visa or Car loan';
   else if ([...name].length > 40) errors.name = 'Names can be up to 40 characters.';
   const balance = parseAmount(raw.balance);
-  if (balance.error) errors.balance = balance.error;
+  if (balance.error) errors.balance = parseAmountOrZero(raw.balance).cents === 0 ? 'Paid off? Nice work! Delete it instead.' : balance.error;
   const apr = parseApr(raw.apr);
   if (apr.error) errors.apr = apr.error;
   const min = String(raw.minPayment ?? '').trim() === '' ? { cents: 0 } : parseAmountOrZero(raw.minPayment);

@@ -2,7 +2,7 @@
 // anything on this device (SECURITY.md §2.3: all-or-nothing, every record re-validated).
 import { encryptJson, decryptJson, DecryptError } from './crypto.js';
 import { MIGRATIONS } from '../db/indexeddb.js';
-import { MAX_CENTS, MAX_NOTE_LENGTH, MIN_DATE, TYPES, cleanNote } from './validate.js';
+import { MAX_CENTS, MAX_NOTE_LENGTH, MIN_DATE, TYPES, cleanNote, MAX_APR_BPS, EMPLOYER_MATCH } from './validate.js';
 import { isIsoDate } from '../utils/dates.js';
 import { isUuid } from '../utils/id.js';
 
@@ -22,7 +22,7 @@ const META_RULES = {
   monthlyTakeHomeCents: (v) => v === null || (Number.isSafeInteger(v) && v > 0 && v <= MAX_CENTS),
   savingsPercent: (v) => Number.isSafeInteger(v) && v >= 0 && v <= 50,
   emergencyFundCents: (v) => v === null || (Number.isSafeInteger(v) && v >= 0 && v <= MAX_CENTS),
-  employerMatch: (v) => v === null || ['full', 'partial', 'none', 'unsure'].includes(v),
+  employerMatch: (v) => v === null || EMPLOYER_MATCH.includes(v),
   skippedSteps: (v) => Array.isArray(v) && v.length <= 20 && v.every((s) => typeof s === 'string' && /^[a-z-]{1,30}$/.test(s)),
 };
 const META_KEYS = new Set(Object.keys(META_RULES));
@@ -123,7 +123,7 @@ function cleanDebt(d) {
   const name = typeof d.name === 'string' ? cleanNote(d.name) : '';
   const ok = isUuid(d.id) && isText(name, 40)
     && Number.isSafeInteger(d.balanceCents) && d.balanceCents > 0 && d.balanceCents <= MAX_CENTS
-    && Number.isSafeInteger(d.aprBps) && d.aprBps >= 0 && d.aprBps <= 9999
+    && Number.isSafeInteger(d.aprBps) && d.aprBps >= 0 && d.aprBps <= MAX_APR_BPS
     && Number.isSafeInteger(d.minPaymentCents) && d.minPaymentCents >= 0 && d.minPaymentCents <= MAX_CENTS
     && isTime(d.createdAt) && isTime(d.updatedAt);
   if (!ok) return null;

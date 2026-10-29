@@ -45,6 +45,8 @@ test('validateDebt: name, balance, and rate are required; minimum is optional', 
   const bad = validateDebt({ name: '  ', balance: '0', apr: 'high', minPayment: 'x' });
   assert.deepEqual(Object.keys(bad.errors).sort(), ['apr', 'balance', 'minPayment', 'name']);
   assert.match(validateDebt({ ...visa, name: 'x'.repeat(41) }).errors.name, /40 characters/);
+  assert.match(validateDebt({ ...visa, balance: '0' }).errors.balance, /Paid off/);
+  assert.equal(validateDebt({ ...visa, apr: '390' }).errors.apr, 'Rates can be up to 99.99%');
   assert.equal(validateDebt(null).ok, false);
 });
 
