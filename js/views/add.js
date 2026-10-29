@@ -86,8 +86,24 @@ function addForm(store) {
     else if (first) form.querySelector(`#${first}`)?.focus();
   }
 
+  const saveButton = form.querySelector('button[type="submit"]');
+  let saving = false;
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    // A double-tap (or Enter then a tap) must not save the same entry twice.
+    if (saving) return;
+    saving = true;
+    saveButton.disabled = true;
+    try {
+      await save();
+    } finally {
+      saving = false;
+      saveButton.disabled = false;
+    }
+  });
+
+  async function save() {
     const input = {
       type,
       amount: amount.value,
@@ -112,7 +128,7 @@ function addForm(store) {
     clear(pickerSlot);
     pickerSlot.append(categoryPicker(categoriesFor(type, store.getState())));
     amount.focus();
-  });
+  }
 
   return { form, amount };
 }

@@ -26,7 +26,26 @@ export async function addSuite({ page, check, base }) {
   check('Form is ready for the next one (amount cleared, focused, still Money out)', await page.eval(`document.getElementById('amount').value === '' && document.activeElement.id === 'amount' && document.getElementById('type-expense').checked && !document.querySelector('input[name="categoryId"]:checked')`));
   check('Most-used category moves to the front', await page.eval(`document.querySelector('input[name="categoryId"]').value === 'c-dining'`));
 
+  // Double-tap protection
+  await page.eval(`document.getElementById('amount').value = '2.50'`);
+  await click('#category-c-dining');
+  await page.eval(`(() => { const f = document.querySelector('form'); f.requestSubmit(); f.requestSubmit(); f.requestSubmit(); })()`);
+  await page.sleep(300);
+  rows = await page.eval(stored);
+  check('Double-tapping Save records it only once', rows.filter((r) => r.cents === 250).length === 1, JSON.stringify(rows.map((r) => r.cents)));
+  check('The toast region exists before the first message (screen readers announce it)', await page.eval(`document.querySelectorAll('.toast-region[role="status"]').length === 1`));
+  await click('.toast-action'); // undo the 2.50
+  await page.sleep(100);
+
   // Undo
+  rows = await page.eval(stored);
+  check('Undo removes only that entry', rows.length === 1 && rows[0].cents === 475, JSON.stringify(rows.map((r) => r.cents)));
+  await page.eval(`(async () => { const { getStore } = await import(new URL('js/appStore.js', location.href)); const s = await getStore(); await s.deleteTransaction(s.getState().transactions[0].id); })()`);
+  await page.goto(`${base}#/home`); await page.goto(`${base}#/add`);
+  await page.eval(`document.getElementById('amount').focus()`);
+  await page.type('4.75');
+  await click('#category-c-dining');
+  await click('form button[type="submit"]');
   await click('.toast-action');
   rows = await page.eval(stored);
   check('Undo removes it', rows.length === 0 && (await toast()) === 'Removed');

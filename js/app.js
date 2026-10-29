@@ -5,6 +5,7 @@ import { homeView } from './views/home.js';
 import { addView } from './views/add.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
+import { initToasts } from './ui/toast.js';
 
 const APP_NAME = 'Budget Manager';
 
@@ -32,6 +33,8 @@ createRouter({
   routes,
   appName: APP_NAME,
 }).start();
+
+initToasts();
 
 // Open the on-device database early (creates it and adds default categories on first run).
 // If this browser can't store data, screens that need it will say so.

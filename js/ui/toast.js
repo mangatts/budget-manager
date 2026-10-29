@@ -5,7 +5,9 @@ import { el, clear } from '../utils/dom.js';
 let region;
 let timer;
 
-function getRegion() {
+// Screen readers only announce changes to a live region that already exists,
+// so the app creates it (empty) at startup, before the first message.
+export function initToasts() {
   if (!region || !region.isConnected) {
     region = el('div', { class: 'toast-region', role: 'status', 'aria-live': 'polite' });
     document.body.append(region);
@@ -20,7 +22,7 @@ export function hideToast() {
 
 // showToast({ message, action: { label, run } }) — run() may be async.
 export function showToast({ message, action, duration = 6000 }) {
-  const target = getRegion();
+  const target = initToasts();
   hideToast();
   const button = action && el('button', { class: 'btn btn-quiet toast-action', type: 'button' }, action.label);
   target.append(el('div', { class: 'toast' }, el('span', { class: 'toast-message' }, message), button));
@@ -31,7 +33,7 @@ export function showToast({ message, action, duration = 6000 }) {
         const done = await action.run();
         showToast({ message: done ?? 'Done', duration: 2500 });
       } catch {
-        showToast({ message: 'That didn’t work. Please try again.', duration: 4000 });
+        showToast({ message: 'That didn\u2019t work. Please try again.', action }); // keep the button so they can retry
       }
     });
   }
