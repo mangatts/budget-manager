@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRoute, DEFAULT_ROUTE } from '../js/router.js';
+import { parseRoute, routeParam, DEFAULT_ROUTE } from '../js/router.js';
 
 const ROUTES = ['home', 'add', 'history', 'tips', 'more'];
 
@@ -32,5 +32,17 @@ test('ignores query strings and extra path segments', () => {
 test('rejects path tricks and injected markup', () => {
   for (const hash of ['#/../../etc', '#/<img src=x onerror=alert(1)>', '#/javascript:alert(1)', '#/constructor', '#/__proto__']) {
     assert.equal(parseRoute(hash, ROUTES), DEFAULT_ROUTE, `hash: ${hash}`);
+  }
+});
+
+test('routeParam reads a simple id from the second segment', () => {
+  assert.equal(routeParam('#/edit/3f6c1a2e-9b7d-4c1e-8a2b-1d2e3f4a5b6c'), '3f6c1a2e-9b7d-4c1e-8a2b-1d2e3f4a5b6c');
+  assert.equal(routeParam('#/edit/abc?x=1'), 'abc');
+  assert.equal(routeParam('#/edit/abc/extra'), 'abc');
+});
+
+test('routeParam rejects missing, malformed, or oversized ids', () => {
+  for (const hash of ['#/edit', '#/edit/', '#/edit/<img src=x onerror=alert(1)>', '#/edit/../../x', '#/edit/a%20b', '#/edit/' + 'a'.repeat(65), '', undefined]) {
+    assert.equal(routeParam(hash), null, `hash: ${hash}`);
   }
 });

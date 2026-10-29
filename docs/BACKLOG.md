@@ -79,6 +79,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E1-S4** As a user, I want to record income so the app knows what I earn. *(S)*
   - ✅ Done: Money in/out toggle switches categories; stays selected for the next entry.
 - **E1-S5** As a user, I want to see, search, edit, and delete past transactions, with undo. *(M)*
+  - ✅ Done: month switcher + totals, search (note/category, accent-insensitive), grouped by day, tap to edit, delete and edit both undoable, safe `#/edit/<id>` links.
 - **E1-S6** As a user, I want to rename, add, or archive categories. *(S)*
 
 ### E2: Never lose data
