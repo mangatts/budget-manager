@@ -103,6 +103,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E3-S2** As a user, I want to switch to past months. *(S)*
   - ✅ Done: ‹ › on Home.
 - **E3-S3** As a user, I want a simple chart of spending by category. *(M)*: use the dataviz skill.
+  - ✅ Done: "Where your money went" on Tips: single-hue bars to scale, top 6 + Everything else, values as text, focus/hover readout, table view.
 
 ### E4: Smart Coach L1 (benchmarks)
 - **E4-S1** As a user, I want benchmarks based on real, current sources so the advice is trustworthy. *(M)*

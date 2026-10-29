@@ -36,6 +36,18 @@ export async function tipsSuite({ page, check, base }) {
   const why = await page.eval(`(() => { const d = document.querySelector('#tips-list .tip details'); return { lines: [...d.querySelectorAll('.math-line')].map((l) => l.textContent), notes: [...d.querySelectorAll('.field-hint')].map((p) => p.textContent) }; })()`);
   check('"Why am I seeing this?" shows the math and the source', why.lines.length >= 4 && why.notes.some((n) => n.includes('Source:')), JSON.stringify(why));
 
+  // "Where your money went" (this month)
+  await page.eval(inStore(`
+    const today = new Date().toLocaleDateString('en-CA');
+    for (const [amount, categoryId] of [['900', 'c-housing'], ['300', 'c-groceries'], ['150', 'c-dining']]) await store.addTransaction({ type: 'expense', amount, categoryId, date: today });
+  `));
+  await page.goto(`${base}#/tips`);
+  const chart = await page.eval(`[...document.querySelectorAll('#where .cat-row')].map((r) => ({ id: r.id, value: r.querySelector('.cat-value').textContent, w: Math.round(r.querySelector('.cat-bar').getBoundingClientRect().width / r.querySelector('.cat-track').getBoundingClientRect().width * 100) }))`);
+  check('Where your money went: biggest first with dollar values', chart.map((c) => c.value).join() === '$900.00,$300.00,$150.00', JSON.stringify(chart));
+  check('Bar lengths are to scale (100 / 33 / 17)', chart.map((c) => c.w).join() === '100,33,17', JSON.stringify(chart.map((c) => c.w)));
+  const rows = await page.eval(`[...document.querySelectorAll('#where-table tbody tr')].map((r) => r.textContent)`);
+  check('Table view has every row', rows.length === 3 && rows[0] === 'Housing$900.0067%', JSON.stringify(rows));
+
   // Home shows the top 2, never more
   await page.goto(`${base}#/home`);
   const home = await page.eval(`({ count: document.querySelectorAll('#home-tips .tip').length, link: !!document.getElementById('all-tips') })`);

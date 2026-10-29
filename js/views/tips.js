@@ -1,14 +1,17 @@
 // Tips: the Smart Coach. Where you could cut back, most valuable first, each with its reasons.
 import { el, clear } from '../utils/dom.js';
 import { formatCents } from '../utils/money.js';
-import { todayLocal } from '../utils/dates.js';
+import { todayLocal, monthKey } from '../utils/dates.js';
 import { getStore } from '../appStore.js';
 import { coachTips, coachStatus, MIN_DAY_FIRST_MONTH } from '../services/insights/engine.js';
 import { tipCard, disclaimer } from '../ui/tipCard.js';
+import { categoryChart } from '../ui/categoryChart.js';
 
 function render(body, state) {
   clear(body);
-  const { tips, reason } = coachStatus(state, todayLocal());
+  const today = todayLocal();
+  body.append(categoryChart(state, monthKey(today)));
+  const { tips, reason } = coachStatus(state, today);
   if (!tips.length) {
     const few = reason === 'not-enough';
     body.append(el('div', { class: 'card', id: 'tips-empty' },
