@@ -39,6 +39,9 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
   }
 
   const usedBy = (categoryId) => state.transactions.filter((t) => t.categoryId === categoryId).length;
+  const billsUsing = (categoryId) => state.bills.filter((b) => b.categoryId === categoryId).length;
+  // A category is "in use" if entries OR bills point at it; it then can't be deleted or switch money in/out.
+  const inUse = (categoryId) => usedBy(categoryId) + billsUsing(categoryId) > 0;
 
   // Undo that can't safely happen (or fails) throws with a message for the person; the toast shows it
   // and keeps its button so they can try again. It never claims "Undone" when nothing changed.
@@ -55,8 +58,8 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     set({ categories });
     const undo = async () => {
       // Entries added since then must keep a valid category of the right type.
-      if (usedBy(record.id) && (!before || before.type !== record.type)) {
-        throw refuse(`Entries now use ${record.name}, so this can\u2019t be undone. You can hide or edit it instead.`);
+      if (inUse(record.id) && (!before || before.type !== record.type)) {
+        throw refuse(`Entries or bills now use ${record.name}, so this can\u2019t be undone. You can hide or edit it instead.`);
       }
       if (before) return orThrow(await saveCategory(before, null));
       try {
@@ -206,7 +209,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       const before = state.categories.find((c) => c.id === id);
       if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
       // Money in/out can't change once entries use it: their history would stop making sense.
-      const type = usedBy(id) ? before.type : input?.type ?? before.type;
+      const type = inUse(id) ? before.type : input?.type ?? before.type;
       const result = validateCategory({ ...input, type }, { categories: state.categories, editingId: id });
       if (!result.ok) return result;
       return saveCategory({ ...before, ...result.value }, before);
@@ -222,7 +225,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     async deleteCategory(id) {
       const before = state.categories.find((c) => c.id === id);
       if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
-      if (usedBy(id)) return { ok: false, errors: { form: 'Entries use this category, so it can\u2019t be deleted. You can hide it instead.' } };
+      if (inUse(id)) return { ok: false, errors: { form: 'Entries or bills use this category, so it can\u2019t be deleted. You can hide it instead.' } };
       try {
         await repo.delete('categories', id);
       } catch {
@@ -233,6 +236,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     },
 
     usedBy: (id) => usedBy(id),
+    billsUsing: (id) => billsUsing(id),
 
     // ── Recurring bills ── (each returns undo)
 

@@ -94,6 +94,18 @@ export async function billsSuite({ page, check, base }) {
   await click('.toast-action');
   check('Undo brings the bill back (list updates live)', (await text('#bill-list'))?.includes('Rent'));
 
+  // A category a bill uses can't be deleted (that would make backups unrestorable)
+  await page.goto(`${base}#/category/c-housing`);
+  check('Category used by a bill: no Delete, explains why', !(await page.eval(`!!document.getElementById('delete-category')`)) && (await page.eval(`document.querySelector('main').textContent.includes('1 bill')`)));
+  const roundTrip = await page.eval(`(async () => {
+    const { getStore } = await import(new URL('js/appStore.js', location.href));
+    const { createBackupFile, openBackupFile } = await import(new URL('js/services/backup.js', location.href));
+    const store = await getStore();
+    const r = await openBackupFile(await createBackupFile(store.snapshot(), 'blue river coffee lamp'), 'blue river coffee lamp');
+    return { ok: r.ok, bills: r.data?.bills.length };
+  })()`);
+  check('A backup with bills opens cleanly (restorable)', roundTrip.ok && roundTrip.bills === 2, JSON.stringify(roundTrip));
+
   // ── 4. Over for the month: information, not blame ──
   await page.eval(inStore(`await store.setProfile({ takeHome: '100', savingsPercent: '0' }); await store.addTransaction({ type: 'income', amount: '1', categoryId: 'c-paycheck', date: '${today}' });`));
   await page.goto(`${base}#/home`);
