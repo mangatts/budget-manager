@@ -47,7 +47,8 @@ export async function shellSuite({ page, check, base }) {
   await page.key('Enter', 'Enter', 13);
   s = await state(page);
   check('Skip link → focus main, URL unchanged', s.focused.startsWith('MAIN') && s.hash === '#/tips');
-  for (let i = 0; i < 3; i++) await page.key('Tab', 'Tab', 9);
+  // Tab forward (past whatever the screen contains) to the History tab, then Enter.
+  for (let i = 0; i < 30 && !(await page.eval(`document.activeElement?.dataset?.route === 'history'`)); i++) await page.key('Tab', 'Tab', 9);
   await page.key('Enter', 'Enter', 13);
   check('Tab to "History" + Enter navigates', (await state(page)).hash === '#/history');
 }

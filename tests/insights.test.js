@@ -65,6 +65,8 @@ test('50/30/20 adds up, and every default benchmark key has a mapping or is inte
   assert.equal(INCOME_BENCHMARKS.needs.share + INCOME_BENCHMARKS.wants.share + INCOME_BENCHMARKS.savings.share, 1);
   const keys = new Set(DEFAULT_CATEGORIES.map((c) => c.benchmarkKey).filter(Boolean));
   const unmapped = [...keys].filter((k) => !(k in CATEGORY_BENCHMARK));
-  assert.deepEqual(unmapped.sort(), ['debt', 'savings']); // measured against income, not the spending mix
+  // debt & savings are measured against income; shopping is too broad for any single BLS line.
+  assert.deepEqual(unmapped.sort(), ['apparel_misc', 'debt', 'savings']);
   for (const target of Object.values(CATEGORY_BENCHMARK)) assert.ok(target in SPENDING_BENCHMARKS, target);
+  assert.equal(CATEGORY_BENCHMARK.apparel_misc, undefined);
 });

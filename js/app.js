@@ -1,5 +1,4 @@
 import { createRouter } from './router.js';
-import { placeholderView } from './views/placeholder.js';
 import { moreView } from './views/more.js';
 import { homeView } from './views/home.js';
 import { addView, editView } from './views/add.js';
@@ -9,6 +8,7 @@ import { categoriesView, categoryView } from './views/categories.js';
 import { wipeView } from './views/wipe.js';
 import { profileView } from './views/profile.js';
 import { billsView, billView } from './views/bills.js';
+import { tipsView } from './views/tips.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
 import { initToasts, setStickyToast } from './ui/toast.js';
@@ -22,7 +22,7 @@ const routes = {
   add: { title: 'Add', view: addView },
   history: { title: 'History', view: historyView },
   edit: { title: 'Edit', view: editView, tab: 'history' }, // #/edit/<id>, not in the tab bar
-  tips: { title: 'Tips', view: () => placeholderView('Tips', 'Smart Coach tips on where to cut back. Coming in Sprint 4.') },
+  tips: { title: 'Tips', view: tipsView },
   more: { title: 'More', view: moreView },
   backup: { title: 'Backups', view: backupView, tab: 'more' }, // not in the tab bar
   categories: { title: 'Categories', view: categoriesView, tab: 'more' },
