@@ -83,3 +83,25 @@ test('challenges travel in backups (v3); older backups restore with none; bad on
     assert.match(validatePayload(buildPayload({ ...base, challenges: [{ ...ch, ...bad }] }, 9)).error, /challenge that isn’t valid/, JSON.stringify(bad));
   }
 });
+
+test('skipped/stopped challenges don’t lock a category, and are cleared with it', async () => {
+  let id = 0;
+  const repo = createRepository(createMemoryAdapter());
+  const store = createStore({ repo, newId: () => `3f6c1a2e-9b7d-4c1e-8a2b-40000000000${++id}`, today: () => '2026-10-28' });
+  await store.init();
+  const skipped = await store.addChallenge({ categoryId: 'c-gifts', month: '2026-10', fromCents: 31000, targetCents: 29000, status: 'skipped' });
+  assert.equal(skipped.record.status, 'skipped'); // one write
+  const del = await store.deleteCategory('c-gifts');
+  assert.equal(del.ok, true);
+  assert.deepEqual(await repo.getAll('challenges'), []);
+  // An active challenge does lock it, with an honest message
+  await store.addChallenge({ categoryId: 'c-dining', month: '2026-10', fromCents: 31000, targetCents: 29000 });
+  assert.match((await store.deleteCategory('c-dining')).errors.form, /active challenge/);
+});
+
+test('backups with repeated challenges are refused', () => {
+  const ch = { id: '3f6c1a2e-9b7d-4c1e-8a2b-500000000001', categoryId: 'c-dining', month: '2026-10', fromCents: 31000, targetCents: 29000, status: 'active', createdAt: 5 };
+  const base = { transactions: [], categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), meta: [], bills: [] };
+  assert.match(validatePayload(buildPayload({ ...base, challenges: [ch, ch] }, 9)).error, /repeated challenge/);
+  assert.match(validatePayload(buildPayload({ ...base, challenges: [ch, { ...ch, id: '3f6c1a2e-9b7d-4c1e-8a2b-500000000002' }] }, 9)).error, /repeated challenge/);
+});

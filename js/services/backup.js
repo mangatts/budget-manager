@@ -146,6 +146,8 @@ export function validatePayload(payload) {
 
   const cleanChallenges = challenges.map((c) => cleanChallenge(c, categoryTypes));
   if (cleanChallenges.includes(null)) return fail('This backup has a challenge that isn\u2019t valid, so nothing was restored.');
+  if (new Set(cleanChallenges.map((c) => c.id)).size !== cleanChallenges.length
+    || new Set(cleanChallenges.map((c) => `${c.categoryId}|${c.month}`)).size !== cleanChallenges.length) return fail('This backup has a repeated challenge, so nothing was restored.');
 
   const cleanMeta = meta.filter((m) => m && Object.hasOwn(META_RULES, m.key) && META_RULES[m.key](m.value)).map((m) => ({ key: m.key, value: m.value }));
   const exportedAt = isTime(payload.exportedAt) ? payload.exportedAt : null;

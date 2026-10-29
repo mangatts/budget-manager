@@ -112,7 +112,7 @@ test('a category used only by a bill can’t be deleted or switch to money in (b
   await store.addBill({ name: 'Vet plan', amount: '30', categoryId: added.record.id, dayOfMonth: 5 });
   const del = await store.deleteCategory(added.record.id);
   assert.equal(del.ok, false);
-  assert.match(del.errors.form, /Entries or bills use this category/);
+  assert.match(del.errors.form, /Entries, bills, or an active challenge use this category/);
   const switched = await store.updateCategory(added.record.id, { ...pets, type: 'income' });
   assert.equal(switched.record.type, 'expense');
   await assert.rejects(added.undo(), (e) => /Entries or bills now use Pets/.test(e.userMessage));

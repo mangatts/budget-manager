@@ -63,8 +63,8 @@ function suggestionCard(store, s) {
     else showToast({ message: result.errors.form ?? 'Couldn’t start it. Please try again.' });
   }));
   skip.addEventListener('click', run(async () => {
-    const result = await store.addChallenge(s);
-    if (result.ok) await store.setChallengeStatus(result.record.id, 'skipped');
+    const result = await store.addChallenge({ ...s, status: 'skipped' });
+    if (!result.ok) showToast({ message: result.errors.form ?? 'Couldn\u2019t save that. Please try again.' });
   }));
   return el('article', { class: 'card challenge', id: `suggest-${s.categoryId}` },
     el('h3', {}, `${s.icon} ${s.name}: ${formatCents(s.fromCents)} → ${formatCents(s.targetCents)}`),
