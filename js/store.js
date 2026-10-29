@@ -2,7 +2,7 @@
 // then announced to subscribers. Changes return an undo() so the UI can offer "Undo" instead of
 // "Are you sure?" dialogs.
 
-import { validateTransaction } from './services/validate.js';
+import { validateTransaction, validateCategory } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
 import { newId as defaultNewId } from './utils/id.js';
 import { todayLocal } from './utils/dates.js';
@@ -33,6 +33,22 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
   async function restore(record) {
     await repo.put('transactions', record);
     set({ transactions: withTransaction(record) });
+  }
+
+  const usedBy = (categoryId) => state.transactions.filter((t) => t.categoryId === categoryId).length;
+
+  async function saveCategory(record, before) {
+    try {
+      await repo.put('categories', record);
+    } catch {
+      return { ok: false, errors: SAVE_FAILED };
+    }
+    const categories = [...state.categories.filter((c) => c.id !== record.id), record].sort((a, b) => a.order - b.order);
+    set({ categories });
+    const undo = before
+      ? () => saveCategory(before, null)
+      : async () => { await repo.delete('categories', record.id); set({ categories: state.categories.filter((c) => c.id !== record.id) }); };
+    return { ok: true, record, undo };
   }
 
   async function remove(id) {
@@ -112,6 +128,48 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         },
       };
     },
+
+    // ── Categories ── (each returns undo)
+
+    async addCategory(input) {
+      const result = validateCategory(input, { categories: state.categories });
+      if (!result.ok) return result;
+      const order = Math.max(0, ...state.categories.map((c) => c.order)) + 1;
+      const record = { id: newId(), ...result.value, benchmarkKey: null, archived: false, order };
+      return saveCategory(record, null);
+    },
+
+    async updateCategory(id, input) {
+      const before = state.categories.find((c) => c.id === id);
+      if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
+      // Money in/out can't change once entries use it: their history would stop making sense.
+      const type = usedBy(id) ? before.type : input?.type ?? before.type;
+      const result = validateCategory({ ...input, type }, { categories: state.categories, editingId: id });
+      if (!result.ok) return result;
+      return saveCategory({ ...before, ...result.value }, before);
+    },
+
+    async setCategoryHidden(id, hidden) {
+      const before = state.categories.find((c) => c.id === id);
+      if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
+      return saveCategory({ ...before, archived: Boolean(hidden) }, before);
+    },
+
+    // Only for categories no entry uses; used ones can be hidden instead, so history stays intact.
+    async deleteCategory(id) {
+      const before = state.categories.find((c) => c.id === id);
+      if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
+      if (usedBy(id)) return { ok: false, errors: { form: 'Entries use this category, so it can\u2019t be deleted. You can hide it instead.' } };
+      try {
+        await repo.delete('categories', id);
+      } catch {
+        return { ok: false, errors: SAVE_FAILED };
+      }
+      set({ categories: state.categories.filter((c) => c.id !== id) });
+      return { ok: true, undo: () => saveCategory(before, null) };
+    },
+
+    usedBy: (id) => usedBy(id),
 
     async deleteTransaction(id) {
       const before = state.transactions.find((t) => t.id === id);
