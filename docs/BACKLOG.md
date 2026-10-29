@@ -134,8 +134,11 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E6: Smart Coach L3 (learning)
 - **E6-S1** As a user, I want to tell the app 👍 / 👎 / "I'm on it" so it shows me more useful tips. *(M)*
+  - ✅ Done: every tip (Tips + Home) has 👍 Helpful / I'm on it / Not now / 👎 Not for me, with Undo. One reaction per tip per month (database v7 `feedback`, in backups v7). Weight per tip type from your history: ×1.25 for 👍 / on it, ×0.8 for 👎, ×0.9 for not now, clamped 0.2–3. 👎 and Not now hide that tip until next month. "Why?" says when your feedback changed a tip's rank.
 - **E6-S2** As a user, I want tips ranked by how much money they'd save me. *(S)*
+  - ✅ Done: score = monthly savings × confidence × your weight; each card shows "About $X a month".
 - **E6-S3** As a user, I want to see if I actually saved money after acting on a tip. *(M)*
+  - ✅ Done: "I'm on it" saves your usual for that tip's categories; the card shows "So far this month: $X, against your usual $Y"; next month Tips opens with "🎉 You cut Dining Out by $95" (or "Close, want to try again?").
 
 ### E7: Bank statement import
 - **E7-S1** Upload + validate + parse CSV (limits, errors per row) *(M)*
@@ -207,7 +210,7 @@ Basic first, then layers (see PRODUCT.md §3).
 | **6** ✅ | Know what's next | E11-S1 → S3 | **Next Best Step** + Money Checkup |
 | **7** ✅ | See the future | E12-S1 → S3 | What-If sliders and debt payoff plan |
 | **8–9** ✅ | Less typing | E7-S1 → S6 | Import a real statement and categorize it |
-| **10** | Smarter | E6-S1 → S3 | Feedback changes which tips show |
+| **10** ✅ | Smarter | E6-S1 → S3 | Feedback changes which tips show |
 | **Later** | AI coach | E8 | Only after a security review |
 
 ## "No reset" release checklist (every sprint from Sprint 2 on)
