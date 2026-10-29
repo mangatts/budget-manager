@@ -134,6 +134,8 @@ export function moreView() {
         linkRow('#/profile', 'Pay, savings, and 401(k)', 'Makes your numbers more accurate', 'profile-link'),
         linkRow('#/bills', 'Bills', 'Rent, phone, subscriptions', 'bills-link'),
         linkRow('#/debts', 'Debts', 'Credit cards and loans', 'debts-link'),
+        linkRow('#/goals', 'Goals', 'What you’re saving for', 'goals-link'),
+        linkRow('#/whatif', 'What if…', 'See how small changes add up', 'whatif-link'),
       ),
     ),
     backupsSection(),

@@ -9,6 +9,8 @@ import { wipeView } from './views/wipe.js';
 import { profileView } from './views/profile.js';
 import { billsView, billView } from './views/bills.js';
 import { debtsView, debtView } from './views/debts.js';
+import { goalsView, goalView } from './views/goals.js';
+import { whatIfView } from './views/whatif.js';
 import { tipsView } from './views/tips.js';
 import { stepsView, checkupView } from './views/steps.js';
 import { designView } from './views/design.js';
@@ -35,6 +37,9 @@ const routes = {
   bill: { title: 'Bill', view: billView, tab: 'more' }, // #/bill/<id> or #/bill/new
   debts: { title: 'Debts', view: debtsView, tab: 'more' },
   debt: { title: 'Debt', view: debtView, tab: 'more' }, // #/debt/<id> or #/debt/new
+  goals: { title: 'Goals', view: goalsView, tab: 'more' },
+  goal: { title: 'Goal', view: goalView, tab: 'more' }, // #/goal/<id> or #/goal/new
+  whatif: { title: 'What if…', view: whatIfView, tab: 'more' },
   steps: { title: 'Your money steps', view: stepsView, tab: 'home' },
   checkup: { title: 'Money Checkup', view: checkupView, tab: 'home' },
   design: { title: 'Design reference', view: designView }, // not in the tab bar
