@@ -39,12 +39,12 @@ export function checkPassphrase(passphrase, confirm) {
 
 export const backupFileName = (date) => `budget-manager-backup-${date}.bmbackup`;
 
-export function buildPayload({ transactions, categories, meta, bills = [] }, now = Date.now()) {
+export function buildPayload({ transactions, categories, meta, bills = [], challenges = [] }, now = Date.now()) {
   return {
     app: APP_ID,
     schemaVersion: MIGRATIONS.length,
     exportedAt: now,
-    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills },
+    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills, challenges },
   };
 }
 
@@ -104,6 +104,17 @@ function cleanBill(b, categoryTypes) {
   return { id: b.id, name, amountCents: b.amountCents, categoryId: b.categoryId, dayOfMonth: b.dayOfMonth, active: b.active, createdAt: b.createdAt, updatedAt: b.updatedAt };
 }
 
+function cleanChallenge(c, categoryTypes) {
+  if (!c || typeof c !== 'object') return null;
+  const amount = (v) => Number.isSafeInteger(v) && v > 0 && v <= MAX_CENTS;
+  const ok = isUuid(c.id) && categoryTypes.get(c.categoryId) === 'expense'
+    && typeof c.month === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(c.month)
+    && amount(c.fromCents) && amount(c.targetCents) && c.targetCents < c.fromCents
+    && ['active', 'skipped', 'stopped'].includes(c.status) && isTime(c.createdAt);
+  if (!ok) return null;
+  return { id: c.id, categoryId: c.categoryId, month: c.month, fromCents: c.fromCents, targetCents: c.targetCents, status: c.status, createdAt: c.createdAt };
+}
+
 // Returns { ok: true, data, summary } or { ok: false, error } — never a partial result.
 export function validatePayload(payload) {
   const fail = (error) => ({ ok: false, error });
@@ -113,6 +124,9 @@ export function validatePayload(payload) {
   const { transactions, categories, meta } = payload.data ?? {};
   // Bills arrived in version 2; older backups simply have none.
   const bills = payload.schemaVersion >= 2 ? payload.data?.bills : [];
+  // Challenges arrived in version 3.
+  const challenges = payload.schemaVersion >= 3 ? payload.data?.challenges : [];
+  if (!Array.isArray(challenges) || challenges.length > 2000) return fail('This backup is damaged and can\u2019t be opened.');
   if (!Array.isArray(transactions) || !Array.isArray(categories) || !Array.isArray(meta) || !Array.isArray(bills)) return fail('This backup is damaged and can’t be opened.');
   if (bills.length > 500) return fail('This backup is too large to restore.');
   if (transactions.length > MAX_TRANSACTIONS || categories.length > MAX_CATEGORIES) return fail('This backup is too large to restore.');
@@ -130,6 +144,9 @@ export function validatePayload(payload) {
   if (cleanBills.includes(null)) return fail('This backup has a bill that isn’t valid, so nothing was restored.');
   if (new Set(cleanBills.map((b) => b.id)).size !== cleanBills.length) return fail('This backup has a repeated bill, so nothing was restored.');
 
+  const cleanChallenges = challenges.map((c) => cleanChallenge(c, categoryTypes));
+  if (cleanChallenges.includes(null)) return fail('This backup has a challenge that isn\u2019t valid, so nothing was restored.');
+
   const cleanMeta = meta.filter((m) => m && Object.hasOwn(META_RULES, m.key) && META_RULES[m.key](m.value)).map((m) => ({ key: m.key, value: m.value }));
   const exportedAt = isTime(payload.exportedAt) ? payload.exportedAt : null;
   // The categories are already in this backup, so don't add the defaults again after restoring.
@@ -142,7 +159,7 @@ export function validatePayload(payload) {
   const dates = cleanTransactions.map((t) => t.date).sort();
   return {
     ok: true,
-    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills },
+    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges },
     summary: { entries: cleanTransactions.length, bills: cleanBills.length, firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null, exportedAt },
   };
 }

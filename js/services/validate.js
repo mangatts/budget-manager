@@ -119,6 +119,22 @@ export function validateProfile(input) {
   return { ok: true, value: { monthlyTakeHomeCents, savingsPercent: percent } };
 }
 
+// ── Cut Plan challenges ──
+
+// input: { categoryId, month: 'YYYY-MM', fromCents, targetCents }
+export function validateChallenge(input, { categories }) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const errors = {};
+  const category = categories.find((c) => c.id === raw.categoryId && c.type === 'expense' && c.bucket !== 'savings');
+  if (!category) errors.categoryId = 'Pick a spending category';
+  if (typeof raw.month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(raw.month)) errors.month = 'Pick a month';
+  const ok = (v) => Number.isSafeInteger(v) && v > 0 && v <= MAX_CENTS;
+  if (!ok(raw.fromCents)) errors.fromCents = 'Missing your usual amount';
+  if (!ok(raw.targetCents) || (ok(raw.fromCents) && raw.targetCents >= raw.fromCents)) errors.targetCents = 'The target should be less than your usual';
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, value: { categoryId: category.id, month: raw.month, fromCents: raw.fromCents, targetCents: raw.targetCents } };
+}
+
 // ── Recurring bills ──
 
 export const MAX_BILL_NAME = 40;

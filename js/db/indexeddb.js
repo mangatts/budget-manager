@@ -18,6 +18,10 @@ export const MIGRATIONS = [
   (db) => {
     db.createObjectStore('bills', { keyPath: 'id' });
   },
+  // v3: Cut Plan challenges (Sprint 5)
+  (db) => {
+    db.createObjectStore('challenges', { keyPath: 'id' });
+  },
 ];
 
 const request = (req) => new Promise((resolve, reject) => {
