@@ -42,12 +42,12 @@ export function checkPassphrase(passphrase, confirm) {
 
 export const backupFileName = (date) => `budget-manager-backup-${date}.bmbackup`;
 
-export function buildPayload({ transactions, categories, meta, bills = [], challenges = [], debts = [], goals = [] }, now = Date.now()) {
+export function buildPayload({ transactions, categories, meta, bills = [], challenges = [], debts = [], goals = [], merchantRules = [] }, now = Date.now()) {
   return {
     app: APP_ID,
     schemaVersion: MIGRATIONS.length,
     exportedAt: now,
-    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills, challenges, debts, goals },
+    data: { transactions, categories, meta: meta.filter((m) => META_KEYS.has(m.key)), bills, challenges, debts, goals, merchantRules },
   };
 }
 
@@ -140,6 +140,14 @@ function cleanGoal(g) {
   return { id: g.id, name, targetCents: g.targetCents, savedCents: g.savedCents, monthlyCents: g.monthlyCents, createdAt: g.createdAt, updatedAt: g.updatedAt };
 }
 
+// Merchant rules you taught the importer. The review queue (imports, pending) isn't backed up: it's temporary.
+function cleanRule(r, categoryTypes) {
+  if (!r || typeof r !== 'object') return null;
+  const ok = typeof r.pattern === 'string' && /^[A-Z0-9]{1,40}$/.test(r.pattern) && categoryTypes.has(r.categoryId)
+    && Number.isSafeInteger(r.timesConfirmed) && r.timesConfirmed >= 1 && r.timesConfirmed <= 1000000 && isTime(r.updatedAt);
+  return ok ? { pattern: r.pattern, categoryId: r.categoryId, timesConfirmed: r.timesConfirmed, updatedAt: r.updatedAt } : null;
+}
+
 // Returns { ok: true, data, summary } or { ok: false, error } — never a partial result.
 export function validatePayload(payload) {
   const fail = (error) => ({ ok: false, error });
@@ -186,6 +194,13 @@ export function validatePayload(payload) {
   if (new Set(cleanChallenges.map((c) => c.id)).size !== cleanChallenges.length
     || new Set(cleanChallenges.map((c) => `${c.categoryId}|${c.month}`)).size !== cleanChallenges.length) return fail('This backup has a repeated challenge, so nothing was restored.');
 
+  // Merchant rules arrived in version 6.
+  const rules = payload.schemaVersion >= 6 ? payload.data?.merchantRules : [];
+  if (!Array.isArray(rules) || rules.length > 5000) return fail('This backup is damaged and can\u2019t be opened.');
+  const cleanRules = rules.map((r) => cleanRule(r, categoryTypes));
+  if (cleanRules.includes(null)) return fail('This backup has a merchant rule that isn\u2019t valid, so nothing was restored.');
+  if (new Set(cleanRules.map((r) => r.pattern)).size !== cleanRules.length) return fail('This backup has a repeated merchant rule, so nothing was restored.');
+
   const cleanMeta = meta.filter((m) => m && Object.hasOwn(META_RULES, m.key) && META_RULES[m.key](m.value)).map((m) => ({ key: m.key, value: m.value }));
   const exportedAt = isTime(payload.exportedAt) ? payload.exportedAt : null;
   // The categories are already in this backup, so don't add the defaults again after restoring.
@@ -198,7 +213,7 @@ export function validatePayload(payload) {
   const dates = cleanTransactions.map((t) => t.date).sort();
   return {
     ok: true,
-    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges, debts: cleanDebts, goals: cleanGoals },
+    data: { transactions: cleanTransactions, categories: cleanCategories, meta: finalMeta, bills: cleanBills, challenges: cleanChallenges, debts: cleanDebts, goals: cleanGoals, merchantRules: cleanRules },
     summary: { entries: cleanTransactions.length, bills: cleanBills.length, firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null, exportedAt },
   };
 }

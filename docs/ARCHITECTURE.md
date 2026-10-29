@@ -200,7 +200,7 @@ All money is stored as **integer cents** (`1250` = $12.50).
 ```
 **Removed:** the `budgets` store (no expected-vs-actual).
 
-**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**; **v3 `challenges`** (Cut Plan: `{ id, categoryId, month, fromCents, targetCents, status: active|skipped|stopped, createdAt }`; results are computed, not stored); **v4 `debts`**; **v5 `goals`**. Planned: `insightFeedback`, `learnerState`, `merchantRules`, `imports`, `pendingTransactions`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
+**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**; **v3 `challenges`** (Cut Plan: `{ id, categoryId, month, fromCents, targetCents, status: active|skipped|stopped, createdAt }`; results are computed, not stored); **v4 `debts`**; **v5 `goals`**; **v6 `imports`, `pending`, `merchantRules`** (keyed by `pattern`; the queue isn't in backups, rules are). Planned: `insightFeedback`, `learnerState`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
 
 ---
 
