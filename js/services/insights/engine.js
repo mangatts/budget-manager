@@ -1,11 +1,10 @@
 // Smart Coach, levels 1–2 (INSIGHTS.md): turns your data into a few plain, sourced tips about
 // where to cut back, each with the money it could free up and a "Why?" that shows the math.
 // Pure functions; money is integer cents. Not financial advice, and the UI says so.
-import { addDays, monthKey, shiftMonth } from '../../utils/dates.js';
+import { monthKey, shiftMonth } from '../../utils/dates.js';
 import { inMonth, incomeForMonth } from './month.js';
 import { SPENDING_BENCHMARKS, INCOME_BENCHMARKS, CATEGORY_BENCHMARK, BLS_2024 } from './benchmarkData.js';
 
-const DAYS_PER_MONTH = 30.4375;
 const MIN_ENTRIES = 10; // fewer and the mix says more about timing than habits
 const MIN_SPENDING = 30000; // $300 in the window
 const MIN_MONTHLY_GAIN = 2500; // don't bother people over less than $25 a month
@@ -25,14 +24,23 @@ const daysIn = (month) => {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 };
 
-// The stretch of history tips look at: 90 days once there are 2+ months of entries, else 30.
+// The history tips look at, in WHOLE calendar months so monthly bills like rent count exactly once:
+// - your last 1–3 complete months that have spending, averaged per month; or
+// - for brand-new users with no complete month yet: this month so far, from the 20th on (not scaled up).
+// Returns null when there isn't enough yet.
+export const MIN_DAY_FIRST_MONTH = 20;
+
 export function spendingWindow(transactions, today) {
+  const month = monthKey(today);
   const expenses = transactions.filter((t) => t.type === 'expense' && t.date <= today);
-  if (!expenses.length) return null;
-  const earliest = expenses.reduce((min, t) => (t.date < min ? t.date : min), today);
-  const days = earliest <= addDays(today, -60) ? 90 : 30;
-  const from = addDays(today, -(days - 1));
-  return { days, from, to: today, entries: expenses.filter((t) => t.date >= from), months: days / DAYS_PER_MONTH };
+  const withSpending = new Set(expenses.map((t) => monthKey(t.date)));
+  const complete = [1, 2, 3].map((n) => shiftMonth(month, -n)).filter((m) => withSpending.has(m));
+  if (complete.length) {
+    const set = new Set(complete);
+    return { kind: 'months', months: complete.length, label: complete.length === 1 ? 'last month' : `last ${complete.length} months, per month`, entries: expenses.filter((t) => set.has(monthKey(t.date))) };
+  }
+  if (Number(today.slice(8, 10)) < MIN_DAY_FIRST_MONTH || !withSpending.has(month)) return null;
+  return { kind: 'month-to-date', months: 1, label: 'this month so far', entries: expenses.filter((t) => monthKey(t.date) === month) };
 }
 
 // ── Level 1: your spending mix vs. typical households (BLS, share of SPENDING, never of income) ──
@@ -48,7 +56,7 @@ function mixTips({ transactions, categories }, today) {
   const baseCents = sum(everyday);
   if (baseCents < MIN_SPENDING) return [];
   const monthlyBase = baseCents / window.months;
-
+  
   const groups = new Map(); // BLS key → { cents, names }
   for (const t of everyday) {
     const key = CATEGORY_BENCHMARK[byId.get(t.categoryId)?.benchmarkKey];
@@ -76,11 +84,11 @@ function mixTips({ transactions, categories }, today) {
       message: `${label} ${g.names.size > 1 ? 'are' : 'is'} ${pct(share)}% of your spending. A typical household spends about ${pct(bench.share)}%. Getting to ${pct(bench.share)}% would free up about ${dollars(gainCents)} a month.`
         + (changeable ? '' : ' Housing is hard to change quickly, so wants may be an easier place to start.'),
       estimatedMonthlySavingsCents: gainCents,
-      confidence: (window.days === 90 ? 0.8 : 0.6) * (changeable ? 1 : 0.3),
+      confidence: (window.kind === 'months' ? 0.6 + 0.1 * window.months : 0.5) * (changeable ? 1 : 0.3),
       why: {
         lines: [
-          [`Your ${label.toLowerCase()} (last ${window.days} days)`, g.cents],
-          [`All your everyday spending (last ${window.days} days)`, baseCents],
+          [`Your ${label.toLowerCase()}, ${window.label}`, Math.round(g.cents / window.months)],
+          [`All your everyday spending, ${window.label}`, Math.round(baseCents / window.months)],
           ['Your share', `${(share * 100).toFixed(1)}%`],
           ['Typical household share', `${(bench.share * 100).toFixed(1)}%`],
           ['Monthly difference', gainCents],
@@ -97,7 +105,8 @@ function mixTips({ transactions, categories }, today) {
 function housingTip(state, today) {
   const window = spendingWindow(state.transactions, today);
   const income = incomeForMonth(state, monthKey(today));
-  if (!window || !income) return [];
+  // Housing is a monthly bill: only judge it over complete months.
+  if (window?.kind !== 'months' || !income) return [];
   const housingIds = new Set(state.categories.filter((c) => CATEGORY_BENCHMARK[c.benchmarkKey] === 'housing').map((c) => c.id));
   const monthly = Math.round(sum(window.entries.filter((t) => housingIds.has(t.categoryId))) / window.months);
   const share = monthly / income.cents;
@@ -128,7 +137,8 @@ function housingTip(state, today) {
 
 // ── Level 2: this month's pace vs. your usual (median of your last 3 months) ──
 export function usualFor(transactions, categoryId, month) {
-  const active = [1, 2, 3].map((n) => shiftMonth(month, -n)).filter((m) => inMonth(transactions, m).length > 0);
+  // Only months where you recorded spending count; a month with just a paycheck isn't a $0 "usual".
+  const active = [1, 2, 3].map((n) => shiftMonth(month, -n)).filter((m) => inMonth(transactions, m).some((t) => t.type === 'expense'));
   if (active.length < 2) return null;
   return median(active.map((m) => sum(inMonth(transactions, m).filter((t) => t.type === 'expense' && t.categoryId === categoryId))));
 }
@@ -176,6 +186,15 @@ function paceTips({ transactions, categories, bills = [] }, today) {
 
 function dollars(cents) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Math.round(cents / 100));
+}
+
+// Why there are no tips: 'not-enough' (we couldn't compare yet) vs 'none' (we compared; nothing stands out).
+export function coachStatus(state, today) {
+  const tips = coachTips(state, today);
+  if (tips.length) return { tips, reason: null };
+  const window = spendingWindow(state.transactions, today);
+  const enough = window && window.entries.length >= MIN_ENTRIES && sum(window.entries) >= MIN_SPENDING;
+  return { tips, reason: enough ? 'none' : 'not-enough' };
 }
 
 // All tips, most valuable first. Score = monthly money freed × confidence.

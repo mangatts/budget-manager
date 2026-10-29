@@ -15,7 +15,8 @@ export async function tipsSuite({ page, check, base }) {
 
   // Ten days of everyday spending, dining out heavy.
   await page.eval(inStore(`
-    const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
+    // Last month (a complete month), so this check works on any day of the month.
+    const day = (n) => { const now = new Date(); return new Date(now.getFullYear(), now.getMonth() - 1, 5 + n).toLocaleDateString('en-CA'); };
     for (let n = 0; n < 10; n++) {
       await store.addTransaction({ type: 'expense', amount: '40', categoryId: 'c-dining', date: day(n), note: 'Lunch out' });
       await store.addTransaction({ type: 'expense', amount: '60', categoryId: 'c-groceries', date: day(n) });

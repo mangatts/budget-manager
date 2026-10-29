@@ -3,18 +3,18 @@ import { el, clear } from '../utils/dom.js';
 import { formatCents } from '../utils/money.js';
 import { todayLocal } from '../utils/dates.js';
 import { getStore } from '../appStore.js';
-import { coachTips } from '../services/insights/engine.js';
+import { coachTips, coachStatus, MIN_DAY_FIRST_MONTH } from '../services/insights/engine.js';
 import { tipCard, disclaimer } from '../ui/tipCard.js';
 
 function render(body, state) {
   clear(body);
-  const tips = coachTips(state, todayLocal());
+  const { tips, reason } = coachStatus(state, todayLocal());
   if (!tips.length) {
-    const few = state.transactions.filter((t) => t.type === 'expense').length < 10;
+    const few = reason === 'not-enough';
     body.append(el('div', { class: 'card', id: 'tips-empty' },
       el('h2', { class: 'section-title' }, few ? 'Tips are on the way' : 'Nothing stands out right now'),
       el('p', {}, few
-        ? 'Add at least 10 expenses (about a week or two of everyday spending) and tips about where you could cut back will appear here.'
+        ? `Tips compare whole months, so they start once you have a full month of spending (or from the ${MIN_DAY_FIRST_MONTH}th of your first month), with at least 10 expenses adding up to $300 or more.`
         : 'Your spending looks close to typical households and to your usual months. Nice work. Check back as you add more.'),
       few ? el('a', { class: 'btn btn-primary', href: '#/add' }, '＋ Add an expense') : null,
     ));

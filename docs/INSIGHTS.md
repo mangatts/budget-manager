@@ -59,6 +59,8 @@ BLS's total includes "personal insurance and pensions" ($9,797, mostly Social Se
 | `education` | 1,569 | 2.0% | 2.3% |
 | `cash_contributions` (gifts, donations) | 2,292 | 2.9% | 3.3% |
 
+**Time window:** tips look at **whole calendar months** (your last 1–3 complete months with spending, averaged per month), so monthly bills like rent count exactly once. Brand-new users with no complete month get spending-mix tips from the 20th of their first month (that month so far, not scaled up). The housing check waits for a complete month.
+
 **Shopping is not compared** to any BLS line. It mixes clothing, household goods, electronics and more, and comparing it to clothing alone (2.9%) would overstate the gap. It still gets "running ahead of your usual" tips (Level 2), which compare you only with yourself.
 
 Update every year when BLS publishes. A changed number only needs `benchmarkData.js` and its test updated.
