@@ -165,7 +165,7 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 ### E11: Next Best Step + Money Checkup
 - **E11-S1** As a user, I want to (optionally) enter my savings, debts, and goals so advice fits me. *(M)*
   - ✅ Done: Your money adds emergency savings (0 allowed, blank = skipped) and 401(k) match; new More → Debts (name, balance, APR, minimum; highest rate first, Undo); database v4 `debts`; backups carry both.
-  - Not yet: savings goals (e.g. "$3,000 for a car by June"). Moved to E12-S1, the first story that needs one.
+  - Savings goals shipped with E12-S1, the first story that uses them.
 - **E11-S2** As a user, I want to see which money step I'm on and one clear next action. *(L, split by step)*
   - ✅ Done: 7 steps worked out from your data (spend < earn → $1,000 starter fund → 401(k) match → debts > 8% APR → 3 months of essentials → save 15% → goals). Home shows the one current step with its action, progress, Skip (Undo), and "Why?"; More detail at `#/steps`. Steps missing info ask one question.
 - **E11-S3** As a user, I want a monthly Money Checkup score with 🟢🟡🔴 explanations. *(M)*
@@ -173,8 +173,11 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E12: What-If
 - **E12-S1** As a user, I want to see how cutting a category changes when I reach a goal. *(M)*
+  - ✅ Done: More → Goals (name, target, saved, monthly; date it's reached; Undo; database v5 `goals`, backups v5). What-If: pick a goal and a nice-to-have category; the slider (default ¼ of your usual) shows the new date and how many months sooner.
 - **E12-S2** As a user, I want a debt payoff plan showing interest saved by paying extra. *(M)*
+  - ✅ Done: month-by-month avalanche simulation (minimums, extra to highest APR, payments roll over); debt-free date, interest, months sooner and interest saved vs minimums only; payoff order; says when minimums don't cover interest.
 - **E12-S3** As a user, I want to see long-term growth of saving/investing, with clear assumptions. *(S)*
+  - ✅ Done: monthly amount + years sliders; 6% a year compounded monthly, before taxes/fees/inflation, not guaranteed, not advice.
 
 ### E8: AI coach (optional, later)
 - **E8-S0** Security review + design of the proxy and data-sharing *(M)*. **Blocks the rest of E8.**
@@ -196,7 +199,7 @@ Basic first, then layers (see PRODUCT.md §3).
 | **4** | Know what to cut | E4-S4, S5, E3-S3, E5-S1 → S3 | Smart Coach tips with "Why?" |
 | **5** | Know what to cut | E5-S4 → S6, E10-S1 → S3 | First **Cut Plan** challenge, month-end win |
 | **6** ✅ | Know what's next | E11-S1 → S3 | **Next Best Step** + Money Checkup |
-| **7** | See the future | E12-S1 → S3 | What-If sliders and debt payoff plan |
+| **7** ✅ | See the future | E12-S1 → S3 | What-If sliders and debt payoff plan |
 | **8–9** | Less typing | E7-S1 → S6 | Import a real statement and categorize it |
 | **10** | Smarter | E6-S1 → S3 | Feedback changes which tips show |
 | **Later** | AI coach | E8 | Only after a security review |

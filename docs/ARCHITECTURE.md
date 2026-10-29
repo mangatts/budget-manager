@@ -183,12 +183,24 @@ All money is stored as **integer cents** (`1250` = $12.50).
   dayOfMonth: 1,            // 1–31; the 31st falls on the last day of shorter months
   active: true, createdAt, updatedAt }
 // A bill counts as paid this month when an entry in its category is within ±10% of its amount.
+
+// debts (database v4): Next Best Step and the payoff plan
+{ id: "uuid", name: "Visa", balanceCents: 240000,
+  aprBps: 2499,             // 24.99% as basis points (parsed as text, no floating point)
+  minPaymentCents: 7500,    // 0 = not given
+  createdAt, updatedAt }
+
+// goals (database v5): What-If and Next Best Step's last step
+{ id: "uuid", name: "New car", targetCents: 300000, savedCents: 50000, monthlyCents: 25000, createdAt, updatedAt }
+
+// meta (Sprint 6): emergencyFundCents (null = skipped, 0 = none yet), employerMatch: full|partial|none|unsure|null,
+//                  skippedSteps: ["step-id", ...] (Next Best Step steps the person chose to skip)
 ```
 
 ```
 **Removed:** the `budgets` store (no expected-vs-actual).
 
-**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**; **v3 `challenges`** (Cut Plan: `{ id, categoryId, month, fromCents, targetCents, status: active|skipped|stopped, createdAt }`; results are computed, not stored). Planned: `insightFeedback`, `learnerState`, `merchantRules`, `imports`, `pendingTransactions`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
+**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**; **v3 `challenges`** (Cut Plan: `{ id, categoryId, month, fromCents, targetCents, status: active|skipped|stopped, createdAt }`; results are computed, not stored); **v4 `debts`**; **v5 `goals`**. Planned: `insightFeedback`, `learnerState`, `merchantRules`, `imports`, `pendingTransactions`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
 
 ---
 

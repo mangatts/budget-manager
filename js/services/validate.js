@@ -144,6 +144,26 @@ export function validateProfile(input) {
 
 export const STEP_IDS = Object.freeze(['spend-less', 'starter-fund', 'match', 'high-interest', 'full-fund', 'save-15', 'goals']);
 
+// ── Savings goals (What-If) ──
+
+// input: { name, target, saved, monthly } → saved and monthly may be blank (0).
+export function validateGoal(input) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const errors = {};
+  const name = cleanNote(raw.name);
+  if (!name) errors.name = 'Give it a name, like Car or Trip to Mexico';
+  else if ([...name].length > 40) errors.name = 'Names can be up to 40 characters.';
+  const target = parseAmount(raw.target);
+  if (target.error) errors.target = target.error;
+  const optional = (value) => (String(value ?? '').trim() === '' ? { cents: 0 } : parseAmountOrZero(value));
+  const saved = optional(raw.saved);
+  if (saved.error) errors.saved = saved.error;
+  const monthly = optional(raw.monthly);
+  if (monthly.error) errors.monthly = monthly.error;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, value: { name, targetCents: target.cents, savedCents: saved.cents, monthlyCents: monthly.cents } };
+}
+
 // ── Debts (Next Best Step) ──
 
 export const MAX_APR_BPS = 9999; // 99.99%

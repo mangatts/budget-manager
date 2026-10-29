@@ -35,6 +35,7 @@ export function debtsView() {
           ),
         ))),
         el('p', { class: 'field-hint', id: 'debt-total' }, `Total owed: ${formatCents(total)}. Highest interest is listed first.`),
+        el('a', { class: 'btn btn-secondary btn-block', href: '#/whatif', id: 'debts-whatif' }, 'See your payoff plan ›'),
       );
     };
     render();
