@@ -17,12 +17,15 @@ const CHASE = [
   'Pending,,UNKNOWN,,,abc,',
 ].join('\r\n');
 // No headers (Wells Fargo style): date, amount, *, blank, description
+// A plain card download: charges are positive, which no header can tell us.
+const CARD = 'Date,Description,Amount\n10/05/2026,STARBUCKS 1234,5.25\n';
 const PLAIN = '"10/20/2026","-9.75","*","","CHIPOTLE 0999 DALLAS TX"\n"10/21/2026","-40.00","*","","SHELL OIL 5555"\n';
 
 export async function importSuite({ page, check, base }) {
   const dir = mkdtempSync(join(tmpdir(), 'bm-import-'));
   try {
-    const files = { chase: join(dir, 'chase.csv'), plain: join(dir, 'checking.csv'), notcsv: join(dir, 'statement.pdf') };
+    const files = { chase: join(dir, 'chase.csv'), plain: join(dir, 'checking.csv'), card: join(dir, 'card.csv'), notcsv: join(dir, 'statement.pdf') };
+    writeFileSync(files.card, CARD);
     writeFileSync(files.chase, CHASE);
     writeFileSync(files.plain, PLAIN);
     writeFileSync(files.notcsv, '%PDF-1.4');
@@ -74,7 +77,7 @@ export async function importSuite({ page, check, base }) {
     await page.sleep(300);
     await chooseFile(page, files.chase);
     await waitFor(`!!document.getElementById('import-summary')`);
-    check('Same file again: 2 already imported, only the skipped row is new', (await text('#import-summary'))?.startsWith('Looks like a Chase statement. 1 new row to review. 2 already imported (left out)'), await text('#import-summary'));
+    check('Same file again: nothing new (2 already imported, 1 skipped before)', (await text('#import-summary'))?.startsWith('Looks like a Chase statement. 0 new rows to review. 2 already imported (left out), 1 you skipped before (left out)') && (await page.eval(`document.getElementById('start-review').disabled`)), await text('#import-summary'));
 
     // Unknown layout → match columns by hand.
     await chooseFile(page, files.plain);
@@ -88,6 +91,19 @@ export async function importSuite({ page, check, base }) {
     check('…then 2 rows to review', (await text('#import-summary')) === '2 new rows to review.', await text('#import-summary'));
     await click('#start-review');
     check('Your rule suggests Dining Out for Chipotle: highlighted, not selected', !!(await page.eval(`document.querySelector('#review-categories .choice-suggested #review-cat-c-dining')`)) && !(await page.eval(`document.getElementById('review-cat-c-dining').checked`)));
+
+    // A recognized layout can still be wrong: fix the direction by hand.
+    await page.goto(`${base}#/import`);
+    await page.sleep(300);
+    await click('#cancel-import');
+    await chooseFile(page, files.card);
+    await waitFor(`!!document.getElementById('import-summary')`);
+    check('Card file: columns found, but the charge reads as money in', (await text('#import-summary'))?.startsWith('Found the date, description, and amount columns.') && (await text('#import-preview'))?.includes('+$5.25'));
+    await click('#rematch-columns');
+    check('"Match the columns yourself" opens the form, pre-filled', (await page.eval(`document.getElementById('map-amount').value`)) === '2');
+    await page.eval(`(() => { const s = document.getElementById('map-signs'); s.value = 'out-positive'; s.dispatchEvent(new Event('change')); })()`);
+    await waitFor(`document.getElementById('import-preview')?.textContent.includes('−$5.25')`);
+    check('…and switching the direction makes it money out', (await text('#import-preview'))?.includes('−$5.25'));
 
     await page.eval(`document.documentElement.dataset.textSize = 'extra-large'`);
     await page.sleep(200);

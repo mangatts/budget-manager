@@ -119,3 +119,36 @@ test('backups carry merchant rules but not the review queue; restore clears the 
   await restored.undo();
   assert.equal(store.getState().pending.length, 3);
 });
+
+// ── Regression tests (code review, security review) ──
+
+test('the stored file name has numbers masked', async () => {
+  const store = await setup();
+  const prepared = await prepareImport(ROWS, M, store.getState());
+  await store.startImport({ fileName: 'acct_123456789.csv', items: prepared.items });
+  assert.equal(store.getState().imports[0].fileName, 'acct_****6789.csv');
+});
+
+test('undoing a cancel is refused once another import is being reviewed', async () => {
+  const store = await setup();
+  await start(store);
+  const cancelled = await store.cancelImport(store.getState().imports[0].id);
+  await start(store);
+  await assert.rejects(cancelled.undo(), /started another import/);
+  assert.equal(store.getState().imports.filter((i) => i.status === 'reviewing').length, 1);
+});
+
+test('if undo can’t remove the entry, the row stays "added" (row and entry stay in step)', async () => {
+  const adapter = createMemoryAdapter();
+  const store = await setup(adapter);
+  await start(store);
+  const row = store.getState().pending[0];
+  const added = await store.addPending(row.id, 'c-dining');
+  const realDelete = adapter.delete.bind(adapter);
+  adapter.delete = async (name, key) => { if (name === 'transactions') throw new Error('disk full'); return realDelete(name, key); };
+  await assert.rejects(added.undo());
+  adapter.delete = realDelete;
+  assert.equal(store.getState().pending[0].decision, 'added');
+  assert.equal(store.getState().transactions.length, 1);
+  assert.equal((await adapter.get('pending', row.id)).decision, 'added');
+});

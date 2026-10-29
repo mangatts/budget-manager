@@ -4,7 +4,7 @@
 
 import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge, validateDebt, validateGoal, cleanNote, STEP_IDS } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
-import { merchantKey } from './services/statementImport/clean.js';
+import { merchantKey, maskNumbers } from './services/statementImport/clean.js';
 import { newId as defaultNewId } from './utils/id.js';
 import { todayLocal } from './utils/dates.js';
 
@@ -80,14 +80,20 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
   }
   async function reopen(row, transactionId) {
     if (!state.pending.some((p) => p.id === row.id)) throw refuse('That import was cancelled, so this can\u2019t be undone.');
+    const decided = state.pending.find((p) => p.id === row.id);
     try {
-      if (transactionId) await remove(transactionId);
       await repo.put('pending', row);
-      await setImportStatus(row.importId, 'reviewing');
     } catch {
       throw refuse(SAVE_FAILED.form);
     }
+    try {
+      if (transactionId) await remove(transactionId);
+    } catch {
+      await repo.put('pending', decided).catch(() => {}); // keep the row and its entry in step
+      throw refuse(SAVE_FAILED.form);
+    }
     set({ pending: state.pending.map((p) => (p.id === row.id ? row : p)) });
+    try { await setImportStatus(row.importId, 'reviewing'); } catch { /* status follows the rows; fixed on the next action */ }
   }
 
   // Merchant rules for a deleted category would make a backup unrestorable, so they go with it.
@@ -367,7 +373,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       if (!items.length) return { ok: false, errors: { form: 'There’s nothing new to review in this file.' } };
       if (state.imports.some((i) => i.status === 'reviewing')) return { ok: false, errors: { form: 'Finish or cancel the statement you’re reviewing first.' } };
       const time = now();
-      const record = { id: newId(), fileName: cleanNote(fileName).slice(0, 100) || 'Statement', uploadedAt: time, rowCount: items.length, status: 'reviewing' };
+      const record = { id: newId(), fileName: [...cleanNote(maskNumbers(fileName))].slice(0, 100).join('') || 'Statement', uploadedAt: time, rowCount: items.length, status: 'reviewing' };
       const pending = items.map((item, order) => ({ ...item, order, id: newId(), importId: record.id, decision: 'pending', transactionId: null }));
       try {
         await repo.putMany('pending', pending);
@@ -425,6 +431,8 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       return {
         ok: true,
         undo: async () => {
+          // Only one import is reviewed at a time.
+          if (record.status === 'reviewing' && state.imports.some((i) => i.status === 'reviewing')) throw refuse('You started another import, so this one can\u2019t come back. Import the file again instead.');
           try { await repo.putMany('pending', rows); await repo.put('imports', record); } catch { throw refuse(SAVE_FAILED.form); }
           set({ imports: [...state.imports, record], pending: [...state.pending, ...rows].sort(byOrder) });
         },

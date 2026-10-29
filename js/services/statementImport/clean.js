@@ -11,7 +11,8 @@ export function maskNumbers(text) {
 }
 
 const NOISE = [
-  /^(?:pos|ach|dbt|debit|credit|card|purchase|recurring|payment|online|web|checkcard|visa|mc|pre-?auth(?:orized)?|withdrawal|electronic|bill pay|des:|id:)\b[\s:]*/i,
+  /^(?:pos|ach|dbt|debit|credit|card|purchase|recurring|payment|online|web|checkcard|visa|mc|pre-?auth(?:orized)?|withdrawal|electronic|bill pay)\b[\s:]*/i,
+  /^(?:des|id|indn|co id|ppd)\s*:\s*/i, // ACH labels: "DES: NETFLIX"
   /^(?:sq|tst|pp|paypal|sp|py|in|dd|apl|ppl|bt|cke|fs)\s*\*\s*/i, // payment processors: "SQ *", "TST* ", "PAYPAL *"
   /^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s+/, // a date at the start
 ];

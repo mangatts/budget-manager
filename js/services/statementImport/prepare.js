@@ -15,46 +15,71 @@ async function sha256Hex(text) {
 
 // Category suggestion: a merchant rule you confirmed, else the category you last gave this merchant on an
 // import. Only categories that still exist, aren't hidden, and match money in/out.
-export function suggestCategory({ merchant, type }, { rules, transactions, categories }) {
+// `history`: merchantKey|type → categoryId from your imports, newest first (see suggestionIndex).
+export function suggestCategory({ merchant, type }, { rules, history, categories }) {
   const key = merchantKey(merchant);
   if (!key) return null;
   const usable = (id) => categories.some((c) => c.id === id && c.type === type && !c.archived);
   const rule = rules.find((r) => r.pattern === key);
   if (rule && usable(rule.categoryId)) return rule.categoryId;
-  const past = transactions.find((t) => t.source === 'import' && t.type === type && merchantKey(t.note) === key && usable(t.categoryId));
-  return past?.categoryId ?? null;
+  const past = history.get(`${key}|${type}`) ?? [];
+  return past.find(usable) ?? null;
 }
 
-// rows: data rows only (header removed). state: { transactions, categories, merchantRules }.
-// → { items, errors: [{ row, error }], alreadyImported, zeroRows }
+// Built once per file (not per row), so big files stay quick.
+export function suggestionIndex(transactions) {
+  const history = new Map();
+  for (const t of [...transactions].sort((a, b) => b.createdAt - a.createdAt)) {
+    if (t.source !== 'import') continue;
+    const k = `${merchantKey(t.note)}|${t.type}`;
+    if (!history.has(k)) history.set(k, []);
+    history.get(k).push(t.categoryId);
+  }
+  return history;
+}
+
+const keepChars = (text, max) => [...text].slice(0, max).join(''); // never split an emoji
+
+// rows: data rows only (header removed). state: { transactions, categories, merchantRules, pending }.
+// → { items, errors: [{ row, error }], alreadyImported, alreadySkipped, zeroRows }
 export async function prepareImport(rows, mapping, state, { firstRowNumber = 1 } = {}) {
-  const fingerprints = new Set(state.transactions.map((t) => t.fingerprint).filter(Boolean));
+  const imported = new Set(state.transactions.map((t) => t.fingerprint).filter(Boolean));
+  // Rows you skipped on an earlier import stay skipped (cancelled imports don't count: you didn't review them).
+  const skipped = new Set((state.pending ?? []).filter((p) => p.decision === 'skipped').map((p) => p.fingerprint));
+  const manual = new Map(); // type|amount|date → a hand-entered entry
+  for (const t of state.transactions) if (t.source === 'manual') manual.set(`${t.type}|${t.amountCents}|${t.date}`, t.id);
+  const ctx = { rules: state.merchantRules ?? [], history: suggestionIndex(state.transactions), categories: state.categories };
   // Byte-for-byte identical rows in one file are usually real (two $5 coffees), so count repeats.
   const seen = new Map();
-  const items = [];
+  const read = [];
   const errors = [];
-  let alreadyImported = 0;
   let zeroRows = 0;
-  const transactions = [...state.transactions].sort((a, b) => b.createdAt - a.createdAt); // newest first for suggestions
   for (let i = 0; i < rows.length; i++) {
     const r = readRow(rows[i], mapping);
     if (!r.ok) { errors.push({ row: i + firstRowNumber, error: r.error }); continue; }
     if (r.skip) { zeroRows++; continue; }
-    const description = cleanNote(maskNumbers(r.description)).slice(0, MAX_NOTE_LENGTH);
-    const merchant = cleanMerchant(description);
+    const description = keepChars(cleanNote(maskNumbers(r.description)), MAX_NOTE_LENGTH);
     const base = `${r.date}|${r.type}|${r.amountCents}|${merchantKey(description)}`;
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);
-    const fingerprint = await sha256Hex(`${base}|${n}`);
-    if (fingerprints.has(fingerprint)) { alreadyImported++; continue; }
+    read.push({ r, description, key: `${base}|${n}` });
+  }
+  const fingerprints = await Promise.all(read.map((x) => sha256Hex(x.key)));
+  const items = [];
+  let alreadyImported = 0;
+  let alreadySkipped = 0;
+  read.forEach(({ r, description }, i) => {
+    const fingerprint = fingerprints[i];
+    if (imported.has(fingerprint)) { alreadyImported++; return; }
+    if (skipped.has(fingerprint)) { alreadySkipped++; return; }
+    const merchant = cleanMerchant(description);
     // Looks like something you added by hand: same amount and money in/out, within a day.
-    const near = new Set([addDays(r.date, -1), r.date, addDays(r.date, 1)]);
-    const twin = state.transactions.find((t) => t.source === 'manual' && t.type === r.type && t.amountCents === r.amountCents && near.has(t.date));
+    const twin = [addDays(r.date, -1), r.date, addDays(r.date, 1)].map((d) => manual.get(`${r.type}|${r.amountCents}|${d}`)).find(Boolean);
     items.push({
       order: items.length, date: r.date, type: r.type, amountCents: r.amountCents, description, merchant, fingerprint,
-      suggestedCategoryId: suggestCategory({ merchant, type: r.type }, { rules: state.merchantRules ?? [], transactions, categories: state.categories }),
-      possibleDuplicateOf: twin?.id ?? null,
+      suggestedCategoryId: suggestCategory({ merchant, type: r.type }, ctx),
+      possibleDuplicateOf: twin ?? null,
     });
-  }
-  return { items, errors, alreadyImported, zeroRows };
+  });
+  return { items, errors, alreadyImported, alreadySkipped, zeroRows };
 }

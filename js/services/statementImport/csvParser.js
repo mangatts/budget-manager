@@ -26,8 +26,10 @@ export function parseCsv(text) {
   let quoted = false;
   let i = 0;
   const endField = () => { row.push(field.trim()); field = ''; };
+  let tooWide = false;
   const endRow = () => {
     endField();
+    if (row.length > MAX_COLUMNS) tooWide = true;
     if (row.some((f) => f !== '')) rows.push(row);
     row = [];
   };
@@ -39,6 +41,7 @@ export function parseCsv(text) {
         quoted = false;
       } else {
         field += ch;
+        if (field.length > MAX_FIELD) return { ok: false, error: `Row ${rows.length + 1} has a value that’s too long. Is this a bank statement?` };
       }
       i++;
       continue;
@@ -56,6 +59,7 @@ export function parseCsv(text) {
   }
   if (quoted) return { ok: false, error: 'This file has a quote that never closes, so it couldn’t be read.' };
   if (field !== '' || row.length) endRow();
+  if (tooWide) return { ok: false, error: 'This file has too many columns to be a bank statement.' };
   if (!rows.length) return { ok: false, error: 'This file is empty.' };
   if (rows.length > MAX_ROWS + 1) return { ok: false, error: `This file has more than ${MAX_ROWS.toLocaleString('en-US')} rows. Try a shorter date range.` };
   return { ok: true, rows };

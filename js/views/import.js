@@ -8,6 +8,7 @@ import { getStore } from '../appStore.js';
 import { checkFile, parseCsv } from '../services/statementImport/csvParser.js';
 import { detectLayout, hasHeader, checkMapping } from '../services/statementImport/layouts.js';
 import { prepareImport, MAX_ROW_ERRORS_SHOWN } from '../services/statementImport/prepare.js';
+import { maskNumbers } from '../services/statementImport/clean.js';
 
 const storageError = () => el('p', { class: 'field-error', role: 'alert' }, 'This browser can’t save data on this device.');
 const signed = (item) => formatCents(item.type === 'income' ? item.amountCents : -item.amountCents, { sign: true });
@@ -31,8 +32,9 @@ function inProgress(store, record) {
 
 // Column matching for files we don't recognize (E7-S2). onChange(mapping) runs on every change.
 function mappingForm(rows, header, initial, onChange) {
-  const names = header ? rows[0] : rows[0].map((_, i) => `Column ${i + 1}`);
-  const sample = header ? rows[1] ?? [] : rows[0];
+  // Header names and sample values are masked too: a column could hold card numbers.
+  const names = header ? rows[0].map((n) => maskNumbers(n).slice(0, 30)) : rows[0].map((_, i) => `Column ${i + 1}`);
+  const sample = (header ? rows[1] ?? [] : rows[0]).map((v) => maskNumbers(v));
   const mapping = { ...initial };
   const pick = (key, label, optional = false) => {
     const select = el('select', { class: 'input', id: `map-${key}` },
@@ -48,7 +50,7 @@ function mappingForm(rows, header, initial, onChange) {
   mapping.signs ??= 'out-negative';
   return el('fieldset', { class: 'section', id: 'column-matching' },
     el('legend', { class: 'section-title' }, 'Match the columns'),
-    el('p', { class: 'field-hint' }, 'We didn’t recognize this layout. Tell us which column is which. Use either one Amount column, or both Money out and Money in.'),
+    el('p', { class: 'field-hint' }, 'Tell us which column is which. Use either one Amount column, or both Money out and Money in.'),
     pick('date', 'Date'), pick('description', 'Description'), pick('amount', 'Amount', true),
     el('div', { class: 'field' }, el('label', { class: 'field-label', for: 'map-signs' }, 'In the Amount column'), signs),
     pick('debit', 'Money out', true), pick('credit', 'Money in', true),
@@ -78,6 +80,9 @@ function uploadForm(store) {
   async function show(mapping, layoutName, firstTime = true) {
     const mine = ++run;
     prepared = null;
+    const problems = checkMapping(mapping, parsed.rows[0].length);
+    // A recognized layout that's missing a column falls back to matching by hand, pre-filled.
+    if (layoutName && Object.keys(problems).length) { layoutName = null; firstTime = true; }
     if (firstTime) {
       clear(details);
       if (!layoutName) details.append(mappingForm(parsed.rows, parsed.header, mapping, (m) => show(m, null, false)));
@@ -85,29 +90,32 @@ function uploadForm(store) {
     }
     clear(results);
     const data = parsed.header ? parsed.rows.slice(1) : parsed.rows;
-    const problems = checkMapping(mapping, parsed.rows[0].length);
     if (Object.keys(problems).length) {
-      if (layoutName) results.append(el('p', { class: 'field-error' }, 'This file’s columns couldn’t be read.'));
-      else results.append(el('p', { class: 'field-hint', id: 'mapping-status' }, Object.values(problems)[0]));
+      results.append(el('p', { class: 'field-hint', id: 'mapping-status' }, Object.values(problems)[0]));
       return;
     }
     const result = await prepareImport(data, mapping, store.getState(), { firstRowNumber: parsed.header ? 2 : 1 });
     if (mine !== run) return;
     prepared = result;
+    // Recognized layouts can still be wrong (e.g. a card statement where charges are positive): let people fix it.
+    const rematch = el('button', { class: 'btn btn-quiet', type: 'button', id: 'rematch-columns' }, 'Money in and out look wrong? Match the columns yourself');
+    rematch.addEventListener('click', () => show(mapping, null));
     const start = el('button', { class: 'btn btn-primary btn-block', type: 'button', id: 'start-review', disabled: !result.items.length }, result.items.length ? `Review ${result.items.length} ${result.items.length === 1 ? 'row' : 'rows'}` : 'Nothing new to review');
     start.addEventListener('click', async () => {
       start.disabled = true;
       const saved = await store.startImport({ fileName: parsed.name, items: prepared.items });
       if (!saved.ok) { start.disabled = false; return showToast({ message: saved.errors.form }); }
+      parsed = prepared = null; // the queue is saved; don't keep the file's rows around
       location.hash = '#/review';
     });
     const notes = [
       result.alreadyImported && `${result.alreadyImported} already imported (left out)`,
+      result.alreadySkipped && `${result.alreadySkipped} you skipped before (left out)`,
       result.zeroRows && `${result.zeroRows} with a $0 amount (left out)`,
       result.errors.length && `${result.errors.length} couldn’t be read`,
     ].filter(Boolean);
     results.append(
-      el('p', { class: 'lead', id: 'import-summary' }, `${layoutName ? `Looks like a ${layoutName} statement. ` : ''}${result.items.length} new ${result.items.length === 1 ? 'row' : 'rows'} to review.${notes.length ? ` ${notes.join(', ')}.` : ''}`),
+      el('p', { class: 'lead', id: 'import-summary' }, `${!layoutName ? '' : layoutName === 'Common layout' ? 'Found the date, description, and amount columns. ' : `Looks like a ${layoutName} statement. `}${result.items.length} new ${result.items.length === 1 ? 'row' : 'rows'} to review.${notes.length ? ` ${notes.join(', ')}.` : ''}`),
       result.items.length ? previewTable(result.items) : null,
       result.errors.length ? el('details', { class: 'why', id: 'row-errors' },
         el('summary', {}, 'Rows that couldn’t be read'),
@@ -115,6 +123,7 @@ function uploadForm(store) {
         result.errors.length > MAX_ROW_ERRORS_SHOWN ? el('p', { class: 'field-hint' }, `…and ${result.errors.length - MAX_ROW_ERRORS_SHOWN} more.`) : null) : null,
       el('p', { class: 'field-hint' }, 'Next you’ll choose a category for each row. Nothing is added until you say so.'),
       start,
+      layoutName ? rematch : null,
     );
   }
 

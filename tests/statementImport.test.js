@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { parseCsv, checkFile, MAX_ROWS } from '../js/services/statementImport/csvParser.js';
 import { detectLayout, parseDate, parseSignedAmount, readRow, checkMapping, hasHeader } from '../js/services/statementImport/layouts.js';
 import { maskNumbers, cleanMerchant, merchantKey } from '../js/services/statementImport/clean.js';
-import { prepareImport, suggestCategory } from '../js/services/statementImport/prepare.js';
+import { prepareImport, suggestCategory, suggestionIndex } from '../js/services/statementImport/prepare.js';
 import { DEFAULT_CATEGORIES } from '../js/services/categories.js';
 
 test('checkFile: .csv only, not empty, at most 5 MB', () => {
@@ -123,12 +123,42 @@ test('prepareImport: already-imported rows are dropped; repeats in one file are 
 
 test('suggestions come from your rules, then your past imports; never for the wrong type or a hidden category', () => {
   const rules = [{ pattern: 'CHIPOTLE', categoryId: 'c-dining', timesConfirmed: 2 }];
-  const ctx = { rules, transactions: [], categories: DEFAULT_CATEGORIES };
+  const ctx = { rules, history: new Map(), categories: DEFAULT_CATEGORIES };
   assert.equal(suggestCategory({ merchant: 'Chipotle', type: 'expense' }, ctx), 'c-dining');
   assert.equal(suggestCategory({ merchant: 'Chipotle', type: 'income' }, ctx), null);
   const past = [{ source: 'import', type: 'expense', note: 'Blue Bottle', categoryId: 'c-dining' }];
-  assert.equal(suggestCategory({ merchant: 'Blue Bottle', type: 'expense' }, { ...ctx, transactions: past }), 'c-dining');
+  assert.equal(suggestCategory({ merchant: 'Blue Bottle', type: 'expense' }, { ...ctx, history: suggestionIndex(past) }), 'c-dining');
   const hidden = DEFAULT_CATEGORIES.map((c) => (c.id === 'c-dining' ? { ...c, archived: true } : c));
   assert.equal(suggestCategory({ merchant: 'Chipotle', type: 'expense' }, { ...ctx, categories: hidden }), null);
   assert.equal(suggestCategory({ merchant: null, type: 'expense' }, ctx), null);
+});
+
+// ── Regression tests (code review, security review) ──
+
+test('parser limits apply inside quotes and on a last row with no newline', () => {
+  assert.match(parseCsv(`a,"${'x'.repeat(2000)}"`).error, /too long/);
+  assert.match(parseCsv(`a\n${'x,'.repeat(60)}x`).error, /too many columns/);
+});
+
+test('ACH labels like "DES:" are removed from merchant names', () => {
+  assert.equal(cleanMerchant('DES: NETFLIX'), 'Netflix');
+  assert.equal(cleanMerchant('ACH DES: ACME PAYROLL'), 'Acme Payroll');
+});
+
+test('row errors never show a full card number', () => {
+  assert.equal(readRow(['4111111111111234', 'X', '1'], { date: 0, description: 1, amount: 2, signs: 'out-negative' }).error, '“****1234” isn’t a date we can read');
+});
+
+test('long descriptions are cut by characters, never splitting an emoji', async () => {
+  const r = await prepareImport([['01/02/2026', `${'a'.repeat(199)}🍕🍕`, '-5']], M, state());
+  assert.equal([...r.items[0].description].length, 200);
+  assert.ok(r.items[0].description.endsWith('🍕'));
+});
+
+test('rows you skipped before are left out of the next overlapping import', async () => {
+  const rows = [['01/02/2026', 'TRANSFER', '-50'], ['01/03/2026', 'COFFEE', '-5']];
+  const first = await prepareImport(rows, M, state());
+  const pending = [{ fingerprint: first.items[0].fingerprint, decision: 'skipped' }];
+  const again = await prepareImport(rows, M, state({ pending }));
+  assert.deepEqual([again.alreadySkipped, again.items.length], [1, 1]);
 });

@@ -2,6 +2,10 @@
 // is matched by hand. Then each row becomes { date, amountCents, type, description } or a row error.
 import { isIsoDate } from '../../utils/dates.js';
 import { MAX_CENTS, MIN_DATE } from '../validate.js';
+import { maskNumbers } from './clean.js';
+
+// Cell text quoted back in a row error: masked (it could be a card number) and short.
+const quote = (cell) => maskNumbers(String(cell ?? '')).slice(0, 20);
 
 const norm = (h) => String(h ?? '').toLowerCase().replace(/[^a-z]/g, '');
 const find = (headers, ...names) => {
@@ -73,12 +77,12 @@ export function parseSignedAmount(text) {
 // A zero amount (a pending hold, a $0 statement line) is skipped, not an error.
 export function readRow(row, mapping) {
   const date = parseDate(row[mapping.date]);
-  if (!date) return { ok: false, error: `“${String(row[mapping.date] ?? '').slice(0, 20)}” isn’t a date we can read` };
+  if (!date) return { ok: false, error: `“${quote(row[mapping.date])}” isn’t a date we can read` };
   if (date < MIN_DATE) return { ok: false, error: 'The date is too far in the past' };
   let signed;
   if (mapping.amount !== undefined && mapping.amount !== -1) {
     signed = parseSignedAmount(row[mapping.amount]);
-    if (signed === null) return { ok: false, error: `“${String(row[mapping.amount] ?? '').slice(0, 20)}” isn’t an amount` };
+    if (signed === null) return { ok: false, error: `“${quote(row[mapping.amount])}” isn’t an amount` };
     if (mapping.signs === 'out-positive') signed = -signed;
   } else {
     const debit = String(row[mapping.debit] ?? '').trim() ? parseSignedAmount(row[mapping.debit]) : 0;
