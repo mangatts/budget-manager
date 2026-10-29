@@ -80,10 +80,12 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 | Key derivation | **PBKDF2-HMAC-SHA-256** (SP 800-132), **600,000 iterations** (OWASP current recommendation) |
 | Salt | 16 random bytes per backup (`crypto.getRandomValues`) |
 | IV | 12 random bytes per encryption, never reused |
-| File format | `{ format: "bm-backup", v: 1, kdf: {...}, iv, salt, ciphertext }` |
+| File format | `{ format: "bm-backup", v: 1, kdf: { name, hash, iterations, salt }, cipher: { name, iv }, ciphertext }`. The header is bound as AES-GCM additional data, so any edit (e.g. a lower iteration count) fails to open. Iterations accepted: 600k–10M. |
 | Passphrase | Min 12 characters (passphrases encouraged), checked against a small list of common passwords. **Warning: a forgotten passphrase means the backup can't be recovered.** |
 
-- Unencrypted export (CSV for spreadsheets) is available only behind a clear warning, with formula escaping.
+- **Restore** (built in E2-S3): ≤ 10 MB file → JSON → decrypt → **every record re-validated and rebuilt from known fields** → preview → one all-or-nothing database transaction → Undo. A single bad record rejects the whole backup.
+- Passphrases are NFC-normalized (same passphrase on any device), min 12 characters, common choices refused.
+- Unencrypted export (CSV for spreadsheets) will be available only behind a clear warning, with formula escaping (not built yet).
 - **On-device data** is protected by the OS (device lock, disk encryption). An optional app-level lock can be evaluated later. It's deferred because it adds data-loss risk if the user forgets the PIN.
 
 ### 2.5 Data minimization (bank imports)

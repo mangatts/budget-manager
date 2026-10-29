@@ -86,8 +86,11 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E2-S1** As a user, I want the browser to keep my data permanently, and to see that it's protected. *(S)*: `storage.persist()` + status.
   - ✅ Done: requested after the first entry and on install; More → Your data shows Protected / Not protected yet + usage.
 - **E2-S2** As a user, I want an encrypted backup file I can save anywhere. *(M)*: AES-256-GCM + PBKDF2, passphrase rules, tests.
+  - ✅ Done: share sheet on phones, download elsewhere; tamper-evident header.
 - **E2-S3** As a user, I want to restore from a backup safely. *(M)*: full validation, all-or-nothing, preview counts before restoring.
+  - ✅ Done: tested end to end on a fresh browser profile ("new phone"), with Undo.
 - **E2-S4** As a user, I want a reminder when my last backup is old. *(S)*
+  - ✅ Done: Home + More after 14 days (or never), "Not now" hides it for a week.
 - **E2-S5** As a user, I want to install the app and use it offline. *(M)*: manifest, icons, versioned SW, update prompt.
   - ✅ Done: installable (Android prompt, iPhone steps), works with the server off, safe update flow; tested end to end.
 - **E2-S6** As a user, I want to delete all my data if I choose. *(S)*
