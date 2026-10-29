@@ -5,8 +5,9 @@
 import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge, validateDebt, validateGoal, cleanNote, STEP_IDS } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
 import { merchantKey, maskNumbers } from './services/statementImport/clean.js';
+import { REACTIONS, topicOf, tipCategories, usualSpending } from './services/insights/learning.js';
 import { newId as defaultNewId } from './utils/id.js';
-import { todayLocal } from './utils/dates.js';
+import { todayLocal, monthKey } from './utils/dates.js';
 
 const SAVE_FAILED = { form: 'Couldn’t save on this device. Check that the browser isn’t in private mode and has free space, then try again.' };
 
@@ -14,7 +15,7 @@ const SAVE_FAILED = { form: 'Couldn’t save on this device. Check that the brow
 const byNewest = (a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1);
 
 // Stored rows → app state (sorted lists, meta as a key → value object).
-const shape = ({ categories, transactions, meta, bills = [], challenges = [], debts = [], goals = [], imports = [], pending = [], merchantRules = [] }) => ({
+const shape = ({ categories, transactions, meta, bills = [], challenges = [], debts = [], goals = [], imports = [], pending = [], merchantRules = [], feedback = [] }) => ({
   categories: [...categories].sort((a, b) => a.order - b.order),
   transactions: [...transactions].sort(byNewest),
   meta: Object.fromEntries(meta.map((m) => [m.key, m.value])),
@@ -25,6 +26,7 @@ const shape = ({ categories, transactions, meta, bills = [], challenges = [], de
   imports: [...imports].sort((a, b) => a.uploadedAt - b.uploadedAt),
   pending: [...pending].sort(byOrder),
   merchantRules: [...merchantRules],
+  feedback: [...feedback].sort(byCreated),
 });
 
 const byDueDay = (a, b) => a.dayOfMonth - b.dayOfMonth || a.name.localeCompare(b.name);
@@ -32,13 +34,14 @@ const byRate = (a, b) => b.aprBps - a.aprBps || a.name.localeCompare(b.name); //
 // Backups accept up to this many (services/backup.js), so the app never makes more.
 const MAX_GOALS = 100;
 const MAX_DEBTS = 100;
+const MAX_FEEDBACK = 4000;
 const byCreated = (a, b) => a.createdAt - b.createdAt;
 const byOrder = (a, b) => a.order - b.order;
 const SORTS = { debts: byRate, goals: byCreated };
-const STATE_STORES = ['categories', 'transactions', 'meta', 'bills', 'challenges', 'debts', 'goals', 'imports', 'pending', 'merchantRules'];
+const STATE_STORES = ['categories', 'transactions', 'meta', 'bills', 'challenges', 'debts', 'goals', 'imports', 'pending', 'merchantRules', 'feedback'];
 
 export function createStore({ repo, now = Date.now, newId = defaultNewId, today = todayLocal }) {
-  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [], debts: [], goals: [], imports: [], pending: [], merchantRules: [] };
+  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [], debts: [], goals: [], imports: [], pending: [], merchantRules: [], feedback: [] };
   const listeners = new Set();
 
   const set = (changes) => {
@@ -237,6 +240,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         imports: state.imports.map((i) => ({ ...i })),
         pending: state.pending.map((p) => ({ ...p })),
         merchantRules: state.merchantRules.map((r) => ({ ...r })),
+        feedback: state.feedback.map((f) => ({ ...f, categoryIds: [...f.categoryIds] })),
       };
     },
 
@@ -285,7 +289,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     async replaceAll(data) {
       const before = this.snapshot();
       // Older backups lack newer stores. A restore also clears any import still being reviewed.
-      data = { bills: [], challenges: [], debts: [], goals: [], imports: [], pending: [], merchantRules: [], ...data };
+      data = { bills: [], challenges: [], debts: [], goals: [], imports: [], pending: [], merchantRules: [], feedback: [], ...data };
       try {
         await repo.replaceAll(data);
       } catch {
@@ -452,6 +456,30 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       };
       try { await write(rule); } catch { return { ok: false, errors: SAVE_FAILED }; }
       return { ok: true, record: rule, undo: async () => { try { await write(before); } catch { throw refuse(SAVE_FAILED.form); } } };
+    },
+
+    // ── Coach feedback ── 👍 / 👎 / "I'm on it" / "Not now": one reaction per tip topic per month. Returns undo.
+    async setTipReaction(tip, reaction) {
+      if (!REACTIONS.includes(reaction) || !tip || typeof tip.type !== 'string') return { ok: false, errors: { form: 'That didn’t work. Please try again.' } };
+      const month = monthKey(today());
+      const topic = topicOf(tip);
+      const before = state.feedback.find((f) => f.topic === topic && f.month === month) ?? null;
+      const categoryIds = tipCategories(tip, state.categories);
+      const record = {
+        id: before?.id ?? newId(), topic, insightType: tip.type, month, reaction, categoryIds,
+        // "I'm on it" remembers your usual, so next month can tell you if it worked.
+        baselineCents: reaction === 'on-it' ? usualSpending(state.transactions, categoryIds, today()) : 0,
+        createdAt: now(),
+      };
+      // Keep well under what a backup accepts (5,000): drop the oldest.
+      const old = !before && state.feedback.length >= MAX_FEEDBACK ? state.feedback.slice(0, state.feedback.length - MAX_FEEDBACK + 1) : [];
+      const write = async (next, drop = []) => {
+        if (next) await repo.put('feedback', next); else await repo.delete('feedback', record.id);
+        for (const f of drop) await repo.delete('feedback', f.id);
+        set({ feedback: [...state.feedback.filter((f) => f.id !== record.id && !drop.includes(f)), ...(next ? [next] : [])].sort(byCreated) });
+      };
+      try { await write(record, old); } catch { return { ok: false, errors: SAVE_FAILED }; }
+      return { ok: true, record, undo: async () => { try { await write(before); } catch { throw refuse(SAVE_FAILED.form); } } };
     },
 
     // ── Savings goals ── (each returns undo)
