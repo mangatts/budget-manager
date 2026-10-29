@@ -101,3 +101,14 @@ test('a backup too large to restore is never made', async () => {
   const ok = await createBackupFile(state(), PASS, 1);
   assert.ok(ok.length <= MAX_FILE_BYTES);
 });
+
+test('profile settings travel in backups; bad values are dropped', async () => {
+  const s = state();
+  s.meta.push({ key: 'monthlyTakeHomeCents', value: 450000 }, { key: 'savingsPercent', value: 0 });
+  const ok = validatePayload(buildPayload(s, 9));
+  assert.deepEqual(ok.data.meta.filter((m) => m.key !== 'seededCategories' && m.key !== 'lastBackupAt'), [{ key: 'monthlyTakeHomeCents', value: 450000 }, { key: 'savingsPercent', value: 0 }]);
+  const bad = state();
+  bad.meta.push({ key: 'savingsPercent', value: 99 }, { key: 'monthlyTakeHomeCents', value: -5 }, { key: 'evil', value: 1 });
+  const dropped = validatePayload(buildPayload(bad, 9)).data.meta.map((m) => m.key);
+  assert.deepEqual(dropped.sort(), ['lastBackupAt', 'seededCategories']);
+});

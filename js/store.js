@@ -2,7 +2,7 @@
 // then announced to subscribers. Changes return an undo() so the UI can offer "Undo" instead of
 // "Are you sure?" dialogs.
 
-import { validateTransaction, validateCategory } from './services/validate.js';
+import { validateTransaction, validateCategory, validateProfile } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
 import { newId as defaultNewId } from './utils/id.js';
 import { todayLocal } from './utils/dates.js';
@@ -124,6 +124,30 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     async setMeta(key, value) {
       await repo.put('meta', { key, value });
       set({ meta: { ...state.meta, [key]: value } });
+    },
+
+    // Take-home pay and savings %, saved together. Returns undo.
+    async setProfile(input) {
+      const result = validateProfile(input);
+      if (!result.ok) return result;
+      const before = { monthlyTakeHomeCents: state.meta.monthlyTakeHomeCents ?? null, savingsPercent: state.meta.savingsPercent };
+      // undefined = "wasn't set before", so undo removes it rather than leaving the new value.
+      const write = async (values) => {
+        const entries = Object.entries(values);
+        const rows = entries.filter(([, v]) => v !== undefined).map(([key, value]) => ({ key, value }));
+        const removed = entries.filter(([, v]) => v === undefined).map(([key]) => key);
+        if (rows.length) await repo.putMany('meta', rows);
+        for (const key of removed) await repo.delete('meta', key);
+        const meta = { ...state.meta, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) };
+        for (const key of removed) delete meta[key];
+        set({ meta });
+      };
+      try {
+        await write(result.value);
+      } catch {
+        return { ok: false, errors: SAVE_FAILED };
+      }
+      return { ok: true, value: result.value, undo: () => write(before) };
     },
 
     // Replaces everything (restore). Data must already be validated (services/backup.js).

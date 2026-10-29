@@ -440,3 +440,40 @@
 .icon-grid .choice input:checked + span::before {
   content: none;
 }
+
+/* ── Home: month at a glance ── */
+/* Money in and out side by side; "Left" is the bottom line, like a statement total. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+#stat-left {
+  grid-column: 1 / -1;
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--border);
+}
+
+#stat-left .stat-value {
+  font-size: var(--text-xl);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.stat-label {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.stat-value {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}

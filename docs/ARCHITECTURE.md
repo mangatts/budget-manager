@@ -170,7 +170,9 @@ All money is stored as **integer cents** (`1250` = $12.50).
 { id, importId, date, amountCents, type, merchant, rawDescription /* masked */,
   suggestedCategoryId, decision: "pending" | "approved" | "skipped" }
 
-// meta
+// meta (settings)
+{ key: "monthlyTakeHomeCents", value: 450000 | null }  // More → Your money
+{ key: "savingsPercent", value: 20 }                  // 0–50, default 20 (50/30/20)
 { key: "schemaVersion", value: 1 }
 { key: "lastBackupAt",  value: 1761650000000 }
 { key: "textSize",      value: "normal" | "large" | "extra-large" }

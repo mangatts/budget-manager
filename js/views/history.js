@@ -10,8 +10,10 @@ let month = null;
 let query = '';
 
 // After editing, show the month the entry is now in (its date may have moved).
-export function showHistoryMonth(key) {
+// "See all" from Home also clears an old search, so History shows every entry it promised.
+export function showHistoryMonth(key, { clearSearch = false } = {}) {
   month = key;
+  if (clearSearch) query = '';
 }
 
 function row(t, category) {
