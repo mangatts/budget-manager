@@ -30,6 +30,12 @@ export const MIGRATIONS = [
   (db) => {
     db.createObjectStore('goals', { keyPath: 'id' });
   },
+  // v6: bank statement import, a review queue and merchant rules (Sprints 8–9)
+  (db) => {
+    db.createObjectStore('imports', { keyPath: 'id' });
+    db.createObjectStore('pending', { keyPath: 'id' });
+    db.createObjectStore('merchantRules', { keyPath: 'pattern' });
+  },
 ];
 
 const request = (req) => new Promise((resolve, reject) => {
