@@ -118,3 +118,31 @@ export function validateProfile(input) {
   if (Object.keys(errors).length) return { ok: false, errors };
   return { ok: true, value: { monthlyTakeHomeCents, savingsPercent: percent } };
 }
+
+// ── Recurring bills ──
+
+export const MAX_BILL_NAME = 40;
+
+// input: { name, amount | amountCents, categoryId, dayOfMonth, active } · keepCategoryId keeps a hidden category valid when editing.
+export function validateBill(input, { categories, keepCategoryId = null }) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const errors = {};
+  const name = cleanNote(raw.name);
+  const length = [...name].length;
+  if (!length) errors.name = 'Give it a name, like Rent or Phone';
+  else if (length > MAX_BILL_NAME) errors.name = `Names can be up to ${MAX_BILL_NAME} characters. Shorten it by ${length - MAX_BILL_NAME}.`;
+
+  const amount = Number.isSafeInteger(raw.amountCents)
+    ? (raw.amountCents > 0 && raw.amountCents <= MAX_CENTS ? { cents: raw.amountCents } : { error: 'Enter an amount more than $0' })
+    : parseAmount(raw.amount);
+  if (amount.error) errors.amount = amount.error;
+
+  const category = categories.find((c) => c.id === raw.categoryId && c.type === 'expense' && (!c.archived || c.id === keepCategoryId));
+  if (!category) errors.categoryId = 'Pick a category';
+
+  const day = typeof raw.dayOfMonth === 'number' ? raw.dayOfMonth : (/^\d{1,2}$/.test(String(raw.dayOfMonth ?? '').trim()) ? Number(String(raw.dayOfMonth).trim()) : NaN);
+  if (!(Number.isInteger(day) && day >= 1 && day <= 31)) errors.dayOfMonth = 'Enter a day from 1 to 31';
+
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, value: { name, amountCents: amount.cents, categoryId: category.id, dayOfMonth: day, active: raw.active !== false } };
+}

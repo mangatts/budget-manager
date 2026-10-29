@@ -1,7 +1,7 @@
 // In-memory adapter with the same interface as indexeddb.js. Used by unit tests (Node has no IndexedDB).
 // Values are copied in and out, like IndexedDB, so callers can't mutate stored records by accident.
 
-const KEY_PATHS = { transactions: 'id', categories: 'id', meta: 'key' };
+const KEY_PATHS = { transactions: 'id', categories: 'id', meta: 'key', bills: 'id' };
 
 export function createMemoryAdapter() {
   const stores = Object.fromEntries(Object.keys(KEY_PATHS).map((name) => [name, new Map()]));
