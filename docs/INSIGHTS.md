@@ -59,6 +59,8 @@ BLS's total includes "personal insurance and pensions" ($9,797, mostly Social Se
 | `education` | 1,569 | 2.0% | 2.3% |
 | `cash_contributions` (gifts, donations) | 2,292 | 2.9% | 3.3% |
 
+**Shopping is not compared** to any BLS line. It mixes clothing, household goods, electronics and more, and comparing it to clothing alone (2.9%) would overstate the gap. It still gets "running ahead of your usual" tips (Level 2), which compare you only with yourself.
+
 Update every year when BLS publishes. A changed number only needs `benchmarkData.js` and its test updated.
 
 ### C. What income is used?

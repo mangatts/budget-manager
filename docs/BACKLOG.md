@@ -113,10 +113,13 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 - **E4-S3** As a user, I want to see my Needs / Wants / Savings split against 50/30/20. *(M)*
   - ✅ Done: meters on Home (dataviz skill: same-hue tracks, guideline markers, status = color + ⚠ + words, focus/hover readout, table view); shown after 5 entries + income.
 - **E4-S4** As a user, I want tips on which categories are above the guideline and how much I'd save. *(M)*
+  - ✅ Done: Tips tab + top 2 on Home; spending-mix vs BLS (share of spending), housing vs HUD 30%; Shopping deliberately not compared (too broad).
 - **E4-S5** As a user, I want "Why am I seeing this?" on every tip. *(S)*
+  - ✅ Done: every tip lists its math, method note, and source.
 
 ### E5: Smart Coach L2 (patterns)
 - **E5-S1** Pace projection *(S)*
+  - ✅ Done: "running ahead of your usual" (median of last 3 months; skips bills, housing, savings, first week).
 - **E5-S2** "Your usual" baselines (median) and higher-than-usual tips *(M)*
 - **E5-S3** Unusual spike detection *(S)*
 - **E5-S4** Small purchases add up *(S)*
