@@ -2,7 +2,8 @@
 // Editing uses the same form, prefilled, with "Save changes" and "Delete" (both undoable).
 import { el, clear } from '../utils/dom.js';
 import { formatCents } from '../utils/money.js';
-import { todayLocal, addYears } from '../utils/dates.js';
+import { todayLocal, addYears, monthKey } from '../utils/dates.js';
+import { showHistoryMonth } from './history.js';
 import { isUuid } from '../utils/id.js';
 import { choiceGroup } from '../ui/choiceGroup.js';
 import { showToast } from '../ui/toast.js';
@@ -127,6 +128,7 @@ function transactionForm(store, record = null) {
     showErrors({});
 
     if (editing) {
+      showHistoryMonth(monthKey(result.record.date));
       showToast({ message: 'Saved changes', action: { label: 'Undo', run: async () => { await result.undo(); return 'Changes undone'; } } });
       location.hash = '#/history';
       return;

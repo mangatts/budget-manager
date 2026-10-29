@@ -9,6 +9,11 @@ import { getStore } from '../appStore.js';
 let month = null;
 let query = '';
 
+// After editing, show the month the entry is now in (its date may have moved).
+export function showHistoryMonth(key) {
+  month = key;
+}
+
 function row(t, category) {
   const signed = formatCents(t.type === 'income' ? t.amountCents : -t.amountCents, { sign: true });
   const name = category?.name ?? 'Unknown';

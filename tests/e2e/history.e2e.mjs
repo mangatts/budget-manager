@@ -72,6 +72,15 @@ export async function historySuite({ page, check, base }) {
   await click('.toast-action');
   check('Undo restores the old amount', (await rows()).some((x) => x.includes('−$4.75')) && !(await rows()).some((x) => x.includes('−$5.25')));
 
+  // Moving an entry to another month: History follows it there
+  await click(`a[href="#/edit/${ids.coffee}"]`);
+  await page.eval(`document.getElementById('date').value = ${JSON.stringify(dates.lastMonth)}`);
+  await click('form button[type="submit"]');
+  await page.sleep(200);
+  check('Changing the date to last month → History shows last month, with the entry', (await rows()).some((x) => x.includes('Coffee with Sam')) && (await rows()).some((x) => x.includes('Old lunch')));
+  await click('.toast-action');
+  await click('#next-month');
+
   // Delete with Undo
   await click(`a[href="#/edit/${ids.pay}"]`);
   await click('.btn-danger');
