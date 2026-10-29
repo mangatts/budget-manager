@@ -75,6 +75,14 @@ export async function categoriesSuite({ page, check, base }) {
   await click('.toast-action');
   check('Undo brings it back, and the open list updates right away', await page.eval(`!!document.querySelector('a[href="#/category/c-gifts"]')`));
 
+  // Double-tap "Add category" makes only one
+  await page.goto(`${base}#/category/new`);
+  await setName('Hobbies');
+  await page.eval(`document.getElementById('bucket-want').click()`);
+  await page.eval(`(() => { const f = document.getElementById('category-form'); f.requestSubmit(); f.requestSubmit(); f.requestSubmit(); })()`);
+  await page.sleep(400);
+  check('Double-tapping "Add category" adds it once', (await page.eval(inStore(`return store.getState().categories.filter((c) => c.name === 'Hobbies').length;`))) === 1);
+
   // Bad link
   await page.goto(`${base}#/category/<script>`);
   check('Bad category link → friendly message', (await text('main .lead')) === 'This category no longer exists.');

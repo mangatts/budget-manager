@@ -77,3 +77,31 @@ test('an unused category can be deleted and the delete undone', async () => {
   await del.undo();
   assert.equal((await repo.get('categories', 'c-gifts')).name, 'Gifts');
 });
+
+test('undo of an add is refused once an entry uses the new category (no orphaned entries)', async () => {
+  const { store, repo } = await setup();
+  const added = await store.addCategory(pets);
+  await store.addTransaction({ type: 'expense', amount: '5', categoryId: added.record.id, date: '2026-10-28' });
+  await assert.rejects(added.undo(), (e) => /Entries now use Pets/.test(e.userMessage));
+  assert.ok(await repo.get('categories', added.record.id));
+});
+
+test('undo of a type change is refused once entries of the new type exist', async () => {
+  const { store } = await setup();
+  const added = await store.addCategory(pets);
+  const changed = await store.updateCategory(added.record.id, { ...pets, type: 'income' });
+  await store.addTransaction({ type: 'income', amount: '5', categoryId: added.record.id, date: '2026-10-28' });
+  await assert.rejects(changed.undo(), (e) => /can’t be undone/.test(e.userMessage));
+  assert.equal(store.getState().categories.find((c) => c.id === added.record.id).type, 'income');
+});
+
+test('a failed undo throws instead of pretending it worked', async () => {
+  const adapter = createMemoryAdapter();
+  let ids = 0;
+  const store = createStore({ repo: createRepository(adapter), newId: () => `3f6c1a2e-9b7d-4c1e-8a2b-10000000000${++ids}`, today: () => '2026-10-28' });
+  await store.init();
+  const hidden = await store.setCategoryHidden('c-gifts', true);
+  adapter.putMany = async () => { throw new Error('quota'); };
+  await assert.rejects(hidden.undo(), (e) => /Couldn’t save/.test(e.userMessage));
+  assert.equal(store.getState().categories.find((c) => c.id === 'c-gifts').archived, true);
+});

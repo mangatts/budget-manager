@@ -116,18 +116,35 @@ function categoryForm(store, category) {
     location.hash = '#/categories';
   };
 
-  form.addEventListener('submit', async (event) => {
+  // One action at a time: a double-tap must not add the same category twice.
+  const buttons = [saveButton, hideButton, deleteButton].filter(Boolean);
+  let busy = false;
+  const once = async (action) => {
+    if (busy) return;
+    busy = true;
+    buttons.forEach((b) => { b.disabled = true; });
+    try {
+      await action();
+    } finally {
+      busy = false;
+      buttons.forEach((b) => { b.disabled = false; });
+    }
+  };
+
+  form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const input = { name: name.value, icon, type, bucket };
-    const result = editing ? await store.updateCategory(category.id, input) : await store.addCategory(input);
-    done(result, editing ? 'Saved changes' : `Added ${result.record?.name}`);
+    once(async () => {
+      const input = { name: name.value, icon, type, bucket };
+      const result = editing ? await store.updateCategory(category.id, input) : await store.addCategory(input);
+      done(result, editing ? 'Saved changes' : `Added ${result.record?.name}`);
+    });
   });
-  hideButton?.addEventListener('click', async () => {
+  hideButton?.addEventListener('click', () => once(async () => {
     done(await store.setCategoryHidden(category.id, !category.archived), category.archived ? `${category.name} is back` : `${category.name} is hidden`);
-  });
-  deleteButton?.addEventListener('click', async () => {
+  }));
+  deleteButton?.addEventListener('click', () => once(async () => {
     done(await store.deleteCategory(category.id), `Deleted ${category.name}`);
-  });
+  }));
   return form;
 }
 

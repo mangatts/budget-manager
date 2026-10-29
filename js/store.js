@@ -37,6 +37,11 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
 
   const usedBy = (categoryId) => state.transactions.filter((t) => t.categoryId === categoryId).length;
 
+  // Undo that can't safely happen (or fails) throws with a message for the person; the toast shows it
+  // and keeps its button so they can try again. It never claims "Undone" when nothing changed.
+  const refuse = (message) => Object.assign(new Error(message), { userMessage: message });
+  const orThrow = (result) => { if (!result.ok) throw refuse(result.errors.form ?? 'That didn\u2019t work. Please try again.'); };
+
   async function saveCategory(record, before) {
     try {
       await repo.put('categories', record);
@@ -45,9 +50,19 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     }
     const categories = [...state.categories.filter((c) => c.id !== record.id), record].sort((a, b) => a.order - b.order);
     set({ categories });
-    const undo = before
-      ? () => saveCategory(before, null)
-      : async () => { await repo.delete('categories', record.id); set({ categories: state.categories.filter((c) => c.id !== record.id) }); };
+    const undo = async () => {
+      // Entries added since then must keep a valid category of the right type.
+      if (usedBy(record.id) && (!before || before.type !== record.type)) {
+        throw refuse(`Entries now use ${record.name}, so this can\u2019t be undone. You can hide or edit it instead.`);
+      }
+      if (before) return orThrow(await saveCategory(before, null));
+      try {
+        await repo.delete('categories', record.id);
+      } catch {
+        throw refuse(SAVE_FAILED.form);
+      }
+      set({ categories: state.categories.filter((c) => c.id !== record.id) });
+    };
     return { ok: true, record, undo };
   }
 
@@ -166,7 +181,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         return { ok: false, errors: SAVE_FAILED };
       }
       set({ categories: state.categories.filter((c) => c.id !== id) });
-      return { ok: true, undo: () => saveCategory(before, null) };
+      return { ok: true, undo: async () => orThrow(await saveCategory(before, null)) };
     },
 
     usedBy: (id) => usedBy(id),
