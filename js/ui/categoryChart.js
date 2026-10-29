@@ -12,10 +12,11 @@ export function categoryChart(state, month) {
   if (!rows.length) {
     return el('section', { class: 'section', id: 'where', 'aria-labelledby': 'where-title' }, title, el('p', { class: 'field-hint', id: 'where-empty' }, 'No money out recorded this month yet.'));
   }
-  const max = rows[0].cents;
+  // Scale to the largest row: "Everything else" (last) can be bigger than any single category.
+  const max = Math.max(...rows.map((r) => r.cents));
   const bars = rows.map((r) => {
     const bar = el('span', { class: 'cat-bar' });
-    bar.style.width = `${Math.max(1, Math.round((r.cents / max) * 100))}%`; // scale: biggest = full width
+    bar.style.width = `${Math.min(100, Math.max(1, Math.round((r.cents / max) * 100)))}%`; // largest = full width
     return el('li', { class: 'cat-row', id: `cat-${r.id}`, tabindex: '0', 'aria-describedby': `cat-tip-${r.id}` },
       el('div', { class: 'meter-head' },
         el('span', {}, el('span', { 'aria-hidden': 'true' }, `${r.icon} `), r.name),
@@ -27,7 +28,7 @@ export function categoryChart(state, month) {
   });
   return el('section', { class: 'card', id: 'where', 'aria-labelledby': 'where-title' },
     title,
-    el('p', { class: 'field-hint' }, `${formatCents(totalCents)} money out, biggest first.`),
+    el('p', { class: 'field-hint' }, `${formatCents(totalCents)} money out. Biggest categories first; smaller ones grouped at the end.`),
     el('ul', { class: 'meters', 'aria-label': 'Money out by category' }, bars),
     el('details', { class: 'why' },
       el('summary', {}, 'Show as a table'),

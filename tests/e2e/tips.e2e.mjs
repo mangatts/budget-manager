@@ -48,6 +48,16 @@ export async function tipsSuite({ page, check, base }) {
   const rows = await page.eval(`[...document.querySelectorAll('#where-table tbody tr')].map((r) => r.textContent)`);
   check('Table view has every row', rows.length === 3 && rows[0] === 'Housing$900.0067%', JSON.stringify(rows));
 
+  // "Everything else" bigger than the top category still fits (scaled to the largest row)
+  await page.eval(inStore(`
+    const today = new Date().toLocaleDateString('en-CA');
+    for (const id of ['c-gas', 'c-shopping', 'c-utilities', 'c-gifts', 'c-health', 'c-entertainment', 'c-subscriptions', 'c-personal-care', 'c-other', 'c-transportation'])
+      await store.addTransaction({ type: 'expense', amount: '200', categoryId: id, date: today });
+  `));
+  await page.goto(`${base}#/tips`);
+  const fit = await page.eval(`(() => { const rows = [...document.querySelectorAll('#where .cat-row')]; return { n: rows.length, widest: Math.max(...rows.map((r) => r.querySelector('.cat-bar').getBoundingClientRect().width / r.querySelector('.cat-track').getBoundingClientRect().width)), last: rows.at(-1).textContent }; })()`);
+  check('"Everything else" larger than the top category: bars stay inside (≤ 100%)', fit.n === 7 && fit.widest <= 1.001 && fit.last.includes('Everything else'), JSON.stringify(fit));
+
   // Home shows the top 2, never more
   await page.goto(`${base}#/home`);
   const home = await page.eval(`({ count: document.querySelectorAll('#home-tips .tip').length, link: !!document.getElementById('all-tips') })`);
