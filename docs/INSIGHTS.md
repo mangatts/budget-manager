@@ -25,21 +25,41 @@ Take-home pay is split into:
 
 Each category has a `bucket` (see ARCHITECTURE.md §9). The Home screen shows your actual split against 50/30/20.
 
-### B. Category benchmarks (share of take-home pay)
+### B. Category benchmarks (verified Oct 2026, E4-S1)
 
-> ⚠️ **These are starting values that must be checked against current sources in the benchmark story (BACKLOG E4-S1)** before release. They live in `benchmarkData.js` with a `source` and `asOf` field on each, so they're easy to update every year.
+All values live in `js/services/insights/benchmarkData.js`, each with `source`, `url`, `asOf`, and `note`. A unit test checks that every entry has them and that the BLS numbers add up.
 
-| Key | Category | Guideline | Source to verify |
+**Two kinds of benchmark. Mixing them up would give wrong advice:**
+
+**1. Measured against income**
+
+| Key | Guideline | Source |
+|---|---|---|
+| `needs` / `wants` / `savings` | 50% / 30% / 20% of take-home pay | 50/30/20 rule of thumb (Warren & Tyagi, *All Your Worth*), labeled as a rule of thumb |
+| `housing` | > 30% of income (incl. utilities) = cost-burdened; > 50% = severe | **HUD** CHAS definitions. HUD uses gross income, and we only have take-home, so our check is a bit stricter. |
+| `debt` | All debt payments ≤ 36% of gross income (homeowners); 15–20% for renters (excl. rent) | **CFPB** *Your Money, Your Goals* DTI tool |
+| `emergency` | 3–6 months of living expenses saved | **CFPB** |
+
+**2. Typical spending mix: compared to your share of *money out*, never to income**
+
+Source: **BLS Consumer Expenditures 2024** (USDL-25-1586, released Dec 19, 2025). Average spending was $78,535.
+
+BLS's total includes "personal insurance and pensions" ($9,797, mostly Social Security payroll deductions). People don't log those as spending, so the base is **$68,738**.
+
+| Key | BLS 2024 $/yr | Share of total spending (published) | Share used by the app (normalized) |
 |---|---|---|---|
-| `housing` | Housing | ≤ 30% of income ("cost-burdened" above that) | HUD |
-| `transportation` | Transport + Gas | ~10–15% | BLS Consumer Expenditure Survey (CE) |
-| `food_home` | Groceries | ~6–10% | BLS CE; USDA Food Plans |
-| `food_away` | Dining Out | ~4–6% | BLS CE |
-| `utilities` | Utilities | ~5–10% | BLS CE |
-| `healthcare` | Health & Insurance | ~5–10% | BLS CE |
-| `entertainment` | Entertainment + Subs | ~4–5% | BLS CE |
-| `savings` | Savings | ≥ 20% (50/30/20); emergency fund 3–6 months of expenses | CFPB / common guidance |
-| `debt` | Debt payments | Total debt payments ≤ 36% of gross income | Common lender DTI guidance (CFPB) |
+| `housing` (incl. utilities) | 26,266 | 33.4% | 38.2% |
+| `transportation` | 13,318 | 17.0% | 19.4% |
+| `food_home` (groceries) | 6,224 | 7.9% | 9.1% |
+| `food_away` (dining out) | 3,945 | 5.0% | 5.7% |
+| `healthcare` | 6,197 | 7.9% | 9.0% |
+| `entertainment` | 3,609 | 4.6% | 5.3% |
+| `apparel` | 2,001 | 2.5% | 2.9% |
+| `personal_care` | 978 | 1.2% | 1.4% |
+| `education` | 1,569 | 2.0% | 2.3% |
+| `cash_contributions` (gifts, donations) | 2,292 | 2.9% | 3.3% |
+
+Update every year when BLS publishes. A changed number only needs `benchmarkData.js` and its test updated.
 
 ### C. What income is used?
 1. If the user entered **take-home pay** in Settings, use that.
@@ -47,7 +67,7 @@ Each category has a `bucket` (see ARCHITECTURE.md §9). The Home screen shows yo
 3. If neither exists, show only spending-only tips and a gentle prompt: "Add your pay to unlock comparisons."
 
 ### Example Level 1 tips
-- "Dining Out is **9%** of your income. The typical guideline is about 5%. Getting to 5% would save **~$180/month**."
+- "Dining out is **9%** of your spending. A typical household spends about 6%. Getting to 6% would save **~$110/month**."
 - "Wants are **41%** of your income (guideline: 30%). Your biggest wants: Dining Out, Shopping."
 - "You're saving **6%**. The guideline is 20%. Even 10% would be **$270/month** more."
 - "Housing is **38%** of your income, above the 30% guideline. This is hard to change fast, so focus on Dining Out and Shopping first."

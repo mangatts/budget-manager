@@ -99,13 +99,17 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E3: Home dashboard
 - **E3-S1** As a user, I want to see money in, money out, and what's left this month. *(S)*
+  - ✅ Done: Home shows in/out/left (Left as the bottom line), recent 5, "See all" to History; updates live.
 - **E3-S2** As a user, I want to switch to past months. *(S)*
+  - ✅ Done: ‹ › on Home.
 - **E3-S3** As a user, I want a simple chart of spending by category. *(M)*: use the dataviz skill.
 
 ### E4: Smart Coach L1 (benchmarks)
 - **E4-S1** As a user, I want benchmarks based on real, current sources so the advice is trustworthy. *(M)*
   - AC: verify every number in INSIGHTS.md against current BLS CE, HUD, and CFPB publications; store `source` + `asOf`.
+  - ✅ Done: BLS CE 2024 (Dec 2025), HUD, CFPB verified. Fixed method: BLS shares compare to spending, not income.
 - **E4-S2** As a user, I want to enter my take-home pay (or have it estimated) so comparisons are accurate. *(S)*
+  - ✅ Done: More → Your money (take-home + savings %, default 20%); otherwise the median of the last 3 months of money in.
 - **E4-S3** As a user, I want to see my Needs / Wants / Savings split against 50/30/20. *(M)*
 - **E4-S4** As a user, I want tips on which categories are above the guideline and how much I'd save. *(M)*
 - **E4-S5** As a user, I want "Why am I seeing this?" on every tip. *(S)*
