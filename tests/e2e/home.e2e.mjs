@@ -12,7 +12,7 @@ export async function homeSuite({ page, check, base }) {
 
   await page.goto(`${base}#/home`);
   check('Empty month: zeros and a friendly message', (await text('#stat-in')).includes('$0.00') && (await text('main .lead'))?.startsWith('No entries in'));
-  check('Suggests adding take-home pay', !!(await page.eval(`document.querySelector('main a[href="#/profile"]')`)));
+  check('Suggests adding take-home pay', !!(await page.eval(`[...document.querySelectorAll('main a[href="#/profile"]')].some((a) => a.textContent === 'add your take-home pay')`)));
 
   const dates = await page.eval(`(() => {
     const now = new Date(); const iso = (d) => d.toLocaleDateString('en-CA');
@@ -62,7 +62,7 @@ export async function homeSuite({ page, check, base }) {
   await page.sleep(300);
   const meta = await page.eval(inStore(`return store.getState().meta;`));
   check('Saves take-home $4,500 and 15%, back to Home', meta.monthlyTakeHomeCents === 450000 && meta.savingsPercent === 15 && (await page.eval('location.hash')) === '#/home');
-  check('Home stops suggesting take-home pay once it’s set', !(await page.eval(`!!document.querySelector('main a[href="#/profile"]')`)));
+  check('Home stops suggesting take-home pay once it’s set', !(await page.eval(`!![...document.querySelectorAll('main a[href="#/profile"]')].some((a) => a.textContent === 'add your take-home pay')`)));
   await page.reload();
   check('Profile survives reload', (await page.eval(inStore(`return store.getState().meta.savingsPercent;`))) === 15);
 
