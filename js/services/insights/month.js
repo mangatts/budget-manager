@@ -32,3 +32,12 @@ export function monthlyIncome({ transactions, meta }, currentMonth) {
   const median = months.length % 2 ? months[mid] : Math.round((months[mid - 1] + months[mid]) / 2);
   return { cents: median, estimated: true };
 }
+
+// Income for a month, as Safe to Spend and the 50/30/20 split use it: the higher of money in recorded
+// that month and the expected monthly income (entered take-home, or estimated). null if none.
+export function incomeForMonth(state, month) {
+  const recordedCents = inMonth(state.transactions, month).filter((t) => t.type === 'income').reduce((s, t) => s + t.amountCents, 0);
+  const expected = monthlyIncome(state, month);
+  if (expected && expected.cents > recordedCents) return { cents: expected.cents, source: expected.estimated ? 'estimated' : 'take-home', recordedCents };
+  return recordedCents > 0 ? { cents: recordedCents, source: 'recorded', recordedCents } : null;
+}
