@@ -11,6 +11,7 @@ import { safeToSpendCard } from '../ui/safeToSpendCard.js';
 import { splitChart } from '../ui/splitChart.js';
 import { billStatusPill } from './bills.js';
 import { topTips } from './tips.js';
+import { cutPlanHome } from '../ui/cutPlan.js';
 
 // Remembered while the app is open.
 let month = null;
@@ -101,6 +102,8 @@ export function homeView() {
       todaySlot.append(safeToSpendCard(state, today));
       const upcoming = upcomingSection(state, today);
       if (upcoming) todaySlot.append(upcoming);
+      const challenges = cutPlanHome(store, today);
+      if (challenges) todaySlot.append(challenges);
       const tips = topTips(state, today);
       if (tips) todaySlot.append(tips);
       label.textContent = formatMonth(month);

@@ -2,7 +2,7 @@
 // then announced to subscribers. Changes return an undo() so the UI can offer "Undo" instead of
 // "Are you sure?" dialogs.
 
-import { validateTransaction, validateCategory, validateProfile, validateBill } from './services/validate.js';
+import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge } from './services/validate.js';
 import { seedCategoriesOnce } from './services/categories.js';
 import { newId as defaultNewId } from './utils/id.js';
 import { todayLocal } from './utils/dates.js';
@@ -13,17 +13,18 @@ const SAVE_FAILED = { form: 'Couldn’t save on this device. Check that the brow
 const byNewest = (a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1);
 
 // Stored rows → app state (sorted lists, meta as a key → value object).
-const shape = ({ categories, transactions, meta, bills = [] }) => ({
+const shape = ({ categories, transactions, meta, bills = [], challenges = [] }) => ({
   categories: [...categories].sort((a, b) => a.order - b.order),
   transactions: [...transactions].sort(byNewest),
   meta: Object.fromEntries(meta.map((m) => [m.key, m.value])),
   bills: [...bills].sort(byDueDay),
+  challenges: [...challenges].sort((a, b) => b.createdAt - a.createdAt),
 });
 
 const byDueDay = (a, b) => a.dayOfMonth - b.dayOfMonth || a.name.localeCompare(b.name);
 
 export function createStore({ repo, now = Date.now, newId = defaultNewId, today = todayLocal }) {
-  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [] };
+  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [] };
   const listeners = new Set();
 
   const set = (changes) => {
@@ -41,7 +42,14 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
   const usedBy = (categoryId) => state.transactions.filter((t) => t.categoryId === categoryId).length;
   const billsUsing = (categoryId) => state.bills.filter((b) => b.categoryId === categoryId).length;
   // A category is "in use" if entries OR bills point at it; it then can't be deleted or switch money in/out.
-  const inUse = (categoryId) => usedBy(categoryId) + billsUsing(categoryId) > 0;
+  // Only ACTIVE challenges lock a category; skipped/stopped ones are cleared when it's deleted or retyped.
+  const activeChallenges = (categoryId) => state.challenges.filter((c) => c.categoryId === categoryId && c.status === 'active').length;
+  const inUse = (categoryId) => usedBy(categoryId) + billsUsing(categoryId) + activeChallenges(categoryId) > 0;
+  async function clearOldChallenges(categoryId) {
+    const old = state.challenges.filter((c) => c.categoryId === categoryId && c.status !== 'active');
+    for (const c of old) await repo.delete('challenges', c.id);
+    if (old.length) set({ challenges: state.challenges.filter((c) => !old.includes(c)) });
+  }
 
   // Undo that can't safely happen (or fails) throws with a message for the person; the toast shows it
   // and keeps its button so they can try again. It never claims "Undone" when nothing changed.
@@ -91,6 +99,21 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     return { ok: true, record, undo };
   }
 
+  async function saveChallenge(record, before) {
+    try {
+      await repo.put('challenges', record);
+    } catch {
+      return { ok: false, errors: SAVE_FAILED };
+    }
+    set({ challenges: [record, ...state.challenges.filter((c) => c.id !== record.id)].sort((a, b) => b.createdAt - a.createdAt) });
+    const undo = async () => {
+      if (before) return orThrow(await saveChallenge(before, null));
+      try { await repo.delete('challenges', record.id); } catch { throw refuse(SAVE_FAILED.form); }
+      set({ challenges: state.challenges.filter((c) => c.id !== record.id) });
+    };
+    return { ok: true, record, undo };
+  }
+
   async function remove(id) {
     await repo.delete('transactions', id);
     set({ transactions: withoutTransaction(id) });
@@ -106,8 +129,8 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
 
     async init() {
       await seedCategoriesOnce(repo);
-      const [categories, transactions, meta, bills] = await Promise.all([repo.getAll('categories'), repo.getAll('transactions'), repo.getAll('meta'), repo.getAll('bills')]);
-      set({ ready: true, ...shape({ categories, transactions, meta, bills }) });
+      const [categories, transactions, meta, bills, challenges] = await Promise.all(['categories', 'transactions', 'meta', 'bills', 'challenges'].map((name) => repo.getAll(name)));
+      set({ ready: true, ...shape({ categories, transactions, meta, bills, challenges }) });
     },
 
     async addTransaction(input) {
@@ -144,6 +167,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
         categories: state.categories.map((c) => ({ ...c })),
         meta: Object.entries(state.meta).map(([key, value]) => ({ key, value })),
         bills: state.bills.map((b) => ({ ...b })),
+        challenges: state.challenges.map((c) => ({ ...c })),
       };
     },
 
@@ -179,7 +203,7 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     // Replaces everything (restore). Data must already be validated (services/backup.js).
     async replaceAll(data) {
       const before = this.snapshot();
-      data = { bills: [], ...data }; // backups from before bills existed have none
+      data = { bills: [], challenges: [], ...data }; // older backups have neither
       try {
         await repo.replaceAll(data);
       } catch {
@@ -212,6 +236,9 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       const type = inUse(id) ? before.type : input?.type ?? before.type;
       const result = validateCategory({ ...input, type }, { categories: state.categories, editingId: id });
       if (!result.ok) return result;
+      if (result.value.type !== before.type) {
+        try { await clearOldChallenges(id); } catch { return { ok: false, errors: SAVE_FAILED }; }
+      }
       return saveCategory({ ...before, ...result.value }, before);
     },
 
@@ -225,8 +252,9 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     async deleteCategory(id) {
       const before = state.categories.find((c) => c.id === id);
       if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
-      if (inUse(id)) return { ok: false, errors: { form: 'Entries or bills use this category, so it can\u2019t be deleted. You can hide it instead.' } };
+      if (inUse(id)) return { ok: false, errors: { form: 'Entries, bills, or an active challenge use this category, so it can\u2019t be deleted. You can hide it instead.' } };
       try {
+        await clearOldChallenges(id);
         await repo.delete('categories', id);
       } catch {
         return { ok: false, errors: SAVE_FAILED };
@@ -253,6 +281,27 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       const result = validateBill(input, { categories: state.categories, keepCategoryId: before.categoryId });
       if (!result.ok) return result;
       return saveBill({ ...before, ...result.value, updatedAt: now() }, before);
+    },
+
+    // ── Cut Plan challenges ── (each returns undo)
+
+    async addChallenge(input) {
+      const result = validateChallenge(input, { categories: state.categories });
+      if (!result.ok) return result;
+      if (state.challenges.some((c) => c.month === result.value.month && c.categoryId === result.value.categoryId)) {
+        return { ok: false, errors: { form: 'There\u2019s already a challenge for this category this month.' } };
+      }
+      // "Not this month" saves straight to skipped (one write, so it can't half-happen).
+      const status = input?.status === 'skipped' ? 'skipped' : 'active';
+      const record = { id: newId(), ...result.value, status, createdAt: now() };
+      return saveChallenge(record, null);
+    },
+
+    // status: 'active' | 'skipped' | 'stopped'
+    async setChallengeStatus(id, status) {
+      const before = state.challenges.find((c) => c.id === id);
+      if (!before || !['active', 'skipped', 'stopped'].includes(status)) return { ok: false, errors: { form: 'This challenge no longer exists.' } };
+      return saveChallenge({ ...before, status }, before);
     },
 
     async deleteBill(id) {

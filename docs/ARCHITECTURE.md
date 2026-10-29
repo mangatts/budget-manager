@@ -188,7 +188,7 @@ All money is stored as **integer cents** (`1250` = $12.50).
 ```
 **Removed:** the `budgets` store (no expected-vs-actual).
 
-**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**. Planned: `insightFeedback`, `learnerState`, `merchantRules`, `imports`, `pendingTransactions`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
+**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**; **v3 `challenges`** (Cut Plan: `{ id, categoryId, month, fromCents, targetCents, status: active|skipped|stopped, createdAt }`; results are computed, not stored). Planned: `insightFeedback`, `learnerState`, `merchantRules`, `imports`, `pendingTransactions`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
 
 ---
 

@@ -1,7 +1,7 @@
 // The only data-access interface the app uses (ARCHITECTURE.md §3). The UI never touches IndexedDB.
 // Wraps an adapter (indexeddb.js in the app, memory.js in tests) and only allows known stores.
 
-export const STORES = Object.freeze(['transactions', 'categories', 'meta', 'bills']);
+export const STORES = Object.freeze(['transactions', 'categories', 'meta', 'bills', 'challenges']);
 
 export function createRepository(adapter) {
   const check = (store) => {

@@ -156,8 +156,11 @@ See [PRODUCT.md](PRODUCT.md) for why these make us different.
 
 ### E10: Cut Plan
 - **E10-S1** As a user, I want 1–2 suggested challenges each month based on my spending. *(M)*
+  - ✅ Done: wants only; target = best recent month kept to a 10–25% cut; skips bills and needs.
 - **E10-S2** As a user, I want to accept or skip a challenge and see my progress on Home. *(M)*
+  - ✅ Done: Take / Not this month / Stop (Undo); progress meter with on track / ahead / over.
 - **E10-S3** As a user, I want a month-end result that celebrates wins. *(S)*
+  - ✅ Done: first week of the next month on Home + Tips (🎉 / "Close, want to try again?").
 
 ### E11: Next Best Step + Money Checkup
 - **E11-S1** As a user, I want to (optionally) enter my savings, debts, and goals so advice fits me. *(M)*
