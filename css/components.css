@@ -527,3 +527,114 @@
 select.input {
   appearance: auto;
 }
+
+/* ── 50/30/20 meters (dataviz: ≤24px bar, 4px rounded data-end, square at the baseline,
+   track = lighter step of the same hue, guideline as a marker, status = color + icon + words) ── */
+.meters {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.meter {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.meter-head {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.meter-label { font-weight: var(--weight-bold); }
+.meter-value { font-variant-numeric: tabular-nums; font-weight: var(--weight-bold); }
+.meter-guide { color: var(--text-muted); font-weight: var(--weight-regular); }
+
+.meter-track {
+  position: relative;
+  display: block;
+  height: 0.9rem;
+  max-height: 24px;
+  background: var(--accent-soft);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+}
+
+.meter-ok { background: var(--accent); }
+.meter-track-warn { background: var(--warning-soft); } /* same-hue track for a warning fill */
+.meter-warn { background: var(--warning); }
+
+.meter-marker {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  box-shadow: 0 0 0 2px var(--surface); /* surface ring keeps it visible over the fill */
+}
+
+.meter-status { font-size: var(--text-sm); font-weight: var(--weight-bold); }
+.meter-status-ok { color: var(--good); }
+.meter-status-warn { color: var(--warning); }
+
+/* Hover/focus readout: dollars behind the percent. */
+.meter-tip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-1));
+  padding: var(--space-1) var(--space-2);
+  background: var(--text);
+  color: var(--bg);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  width: max-content;
+  max-width: 100%; /* wraps instead of spilling off a phone screen at Extra large text */
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.meter:hover .meter-tip,
+.meter:focus-visible .meter-tip {
+  opacity: 1;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table caption {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  padding-bottom: var(--space-2);
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-2) var(--space-1);
+  border-bottom: var(--border-width) solid var(--border);
+  text-align: left;
+}
+
+/* Wide tables scroll inside their own box, never the whole page. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
