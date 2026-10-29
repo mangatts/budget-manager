@@ -2,7 +2,7 @@
 // The offline check stops a real server, so nothing can quietly come from the network.
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -43,7 +43,7 @@ export async function pwaSuite({ page, check, base }) {
   const more = await page.eval(`({ install: document.getElementById('install-body')?.textContent ?? '', storage: document.getElementById('storage-status')?.textContent ?? '' })`);
   check('More explains how to install', more.install.length > 40, more.install.slice(0, 80));
   check('More shows whether data is protected, and the entry count', /Protected|Not protected yet/.test(more.storage) && /\d+ (entry|entries)/.test(more.storage), more.storage);
-  check('Local development skips the service worker unless asked', !(await page.eval('navigator.serviceWorker.controller')));
+  if (/127\.0\.0\.1|localhost/.test(base)) check('Local development skips the service worker unless asked', !(await page.eval('navigator.serviceWorker.controller')));
 
   // Real offline test on a separate server we can stop.
   const port = 5600 + Math.floor(Math.random() * 300);
@@ -68,6 +68,10 @@ export async function pwaSuite({ page, check, base }) {
     // Publish a new version: the app offers "Update", and only switches when asked.
     const swPath = join(site, 'sw.js');
     writeFileSync(swPath, readFileSync(swPath, 'utf8').replace(/const VERSION = '(\w+)'/, "const VERSION = '$1-next'"));
+    // The test server reports change times to the second; move it clearly forward so the browser's
+    // "has it changed?" check can't get "not modified" for an edit made in the same second.
+    const later = new Date(Date.now() + 60_000);
+    utimesSync(swPath, later, later);
     const oldCache = await page.eval(`caches.keys().then((k) => k.join())`);
     // Ask the browser to check for updates, retrying: a check already running from the page load
     // may still have the old file, and the browser merges our request into it.

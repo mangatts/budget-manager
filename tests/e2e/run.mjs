@@ -8,9 +8,10 @@ import { dataSuite } from './data.e2e.mjs';
 import { addSuite } from './add.e2e.mjs';
 import { historySuite } from './history.e2e.mjs';
 import { pwaSuite } from './pwa.e2e.mjs';
+import { backupSuite } from './backup.e2e.mjs';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5500/';
-const suites = [['App shell', shellSuite], ['Display settings', displaySuite], ['On-device data', dataSuite], ['Add screen', addSuite], ['History', historySuite], ['Install & offline', pwaSuite]];
+const suites = [['App shell', shellSuite], ['Display settings', displaySuite], ['On-device data', dataSuite], ['Add screen', addSuite], ['History', historySuite], ['Install & offline', pwaSuite], ['Backups', backupSuite]];
 
 // E2E_ONLY="Add screen" runs one suite while developing; CI always runs them all.
 const only = process.env.E2E_ONLY;
