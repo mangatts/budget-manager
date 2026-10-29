@@ -3,7 +3,6 @@
 export async function debtsSuite({ page, check, base }) {
   const text = (selector) => page.eval(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? null`);
   const click = async (selector) => { await page.eval(`document.querySelector(${JSON.stringify(selector)}).click()`); await page.sleep(250); };
-  const type = (selector, value) => page.eval(`(() => { const i = document.querySelector(${JSON.stringify(selector)}); i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   const meta = () => page.eval(`(async () => {
     const { getStore } = await import(new URL('js/appStore.js', location.href));
     const m = (await getStore()).getState().meta;
@@ -14,11 +13,11 @@ export async function debtsSuite({ page, check, base }) {
   await page.goto(`${base}#/more`);
   await click('#profile-link');
   check('Your money asks about emergency savings and a 401(k) match', !!(await page.eval(`document.getElementById('emergency-fund') && document.querySelectorAll('input[name="employer-match"]').length === 4`)));
-  await type('#emergency-fund', 'lots');
+  await page.eval(`document.querySelector('#emergency-fund').value = 'lots'`);
   await page.eval(`document.getElementById('profile-form').requestSubmit()`);
   await page.sleep(250);
   check('A bad emergency amount shows an error next to the field, and nothing is saved', (await text('#emergency-fund-error'))?.includes('amount') && (await page.eval(`document.activeElement.id`)) === 'emergency-fund' && (await meta()).fund === 'unset');
-  await type('#emergency-fund', '0');
+  await page.eval(`document.querySelector('#emergency-fund').value = '0'`);
   await click('#employer-match-partial');
   await page.eval(`document.getElementById('profile-form').requestSubmit()`);
   await page.sleep(300);
@@ -39,17 +38,17 @@ export async function debtsSuite({ page, check, base }) {
   await page.eval(`document.getElementById('debt-form').requestSubmit()`);
   await page.sleep(250);
   check('Empty form → errors for name, balance, and rate; focus on name', (await text('#debt-name-error')) && (await text('#debt-balance-error')) && (await text('#debt-apr-error')) && (await page.eval(`document.activeElement.id`)) === 'debt-name');
-  await type('#debt-name', 'Visa');
-  await type('#debt-balance', '2,400');
-  await type('#debt-apr', '24.99%');
-  await type('#debt-min', '75');
+  await page.eval(`document.querySelector('#debt-name').value = 'Visa'`);
+  await page.eval(`document.querySelector('#debt-balance').value = '2,400'`);
+  await page.eval(`document.querySelector('#debt-apr').value = '24.99%'`);
+  await page.eval(`document.querySelector('#debt-min').value = '75'`);
   await page.eval(`document.getElementById('debt-form').requestSubmit()`);
   await page.sleep(300);
   check('Add a debt → back to Debts, with Undo', (await page.eval('location.hash')) === '#/debts' && (await text('.toast-message')) === 'Added Visa');
   await click('#add-debt');
-  await type('#debt-name', 'Car loan');
-  await type('#debt-balance', '9000');
-  await type('#debt-apr', '6.5');
+  await page.eval(`document.querySelector('#debt-name').value = 'Car loan'`);
+  await page.eval(`document.querySelector('#debt-balance').value = '9000'`);
+  await page.eval(`document.querySelector('#debt-apr').value = '6.5'`);
   await page.eval(`document.getElementById('debt-form').requestSubmit()`);
   await page.sleep(300);
   const rows = await page.eval(`[...document.querySelectorAll('#debt-list li')].map((li) => li.textContent)`);
@@ -57,7 +56,7 @@ export async function debtsSuite({ page, check, base }) {
   check('Shows the total owed', (await text('#debt-total'))?.includes('$11,400.00'));
 
   await click('#debt-list a');
-  await type('#debt-balance', '2000');
+  await page.eval(`document.querySelector('#debt-balance').value = '2000'`);
   await page.eval(`document.getElementById('debt-form').requestSubmit()`);
   await page.sleep(300);
   check('Edit a debt', (await text('#debt-list'))?.includes('$2,000.00'));
