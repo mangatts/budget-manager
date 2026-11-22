@@ -3,7 +3,9 @@
 export async function cardsSuite({ page, check, base }) {
   const text = (selector) => page.eval(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? null`);
   const click = async (selector) => { await page.eval(`document.querySelector(${JSON.stringify(selector)}).click()`); await page.sleep(250); };
-  const fill = (values) => page.eval(`(() => { for (const [id, v] of Object.entries(${JSON.stringify(values)})) document.getElementById(id).value = v; })()`);
+  const fill = async (values) => {
+    for (const [id, v] of Object.entries(values)) await page.eval(`document.getElementById(${JSON.stringify(id)}).value = ${JSON.stringify(v)}`);
+  };
   const submit = async (id) => { await page.eval(`document.getElementById(${JSON.stringify(id)}).requestSubmit()`); await page.sleep(300); };
   const focused = () => page.eval('document.activeElement?.id');
   const today = await page.eval(`new Date().toLocaleDateString('en-CA')`);
