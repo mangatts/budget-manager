@@ -1,7 +1,7 @@
 {
   "name": "Budget Manager",
   "short_name": "Budget",
-  "description": "A private money coach. Your data stays on your device.",
+  "description": "Track your credit cards and income, and see what to pay each month. Your data stays on your device.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

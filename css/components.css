@@ -736,3 +736,11 @@ select.input {
   color: var(--accent);
   font-weight: var(--weight-bold);
 }
+
+/* ── Pay this month: the amount stays on one line; the details beside it wrap instead ── */
+.pay-amount {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}

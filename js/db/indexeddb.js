@@ -40,6 +40,13 @@ export const MIGRATIONS = [
   (db) => {
     db.createObjectStore('feedback', { keyPath: 'id' });
   },
+  // v8: the simple cards app. Older stores stay (read once to carry data over, cleared by "Delete everything").
+  (db) => {
+    db.createObjectStore('cards', { keyPath: 'id' });
+    db.createObjectStore('checkins', { keyPath: 'date' }); // one check-in per day
+    db.createObjectStore('incomes', { keyPath: 'id' });
+    db.createObjectStore('expenses', { keyPath: 'id' });
+  },
 ];
 
 const request = (req) => new Promise((resolve, reject) => {

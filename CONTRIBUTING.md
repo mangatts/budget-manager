@@ -6,7 +6,7 @@
 
 1. **Pick a story** from the board / [docs/BACKLOG.md](docs/BACKLOG.md).
 2. **Branch** from `main`, named `<type>/<story>-<short-name>`:
-   - `feat/E1-S3-add-expense`, `fix/E2-S3-restore-crash`, `chore/E0-ci`, `docs/insights-benchmarks`
+   - `feat/S2-card-reminders`, `fix/checkin-date`, `chore/ci`, `docs/architecture`
 3. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/):
    - `feat: add expense form`, `fix: reject negative amounts`, `docs: …`, `test: …`, `chore: …`, `security: …`
 4. **Check locally** before pushing:
@@ -38,7 +38,7 @@
 
 - No `innerHTML`, `eval`, inline scripts, or inline event handlers. Build DOM with `utils/dom.js`.
 - No third-party runtime code, CDNs, or network calls.
-- All outside data (forms, CSV, backups) goes through `validate.js`.
+- All outside data (forms, backups) goes through `validate.js` (or the backup validator).
 - Offline: the service worker is **off on localhost** so edits show on refresh. To test offline locally, run `localStorage.setItem('bm:dev-sw', '1')` in DevTools and reload (`npm run e2e` does this for you).
 - Money is stored as integer cents. Show it with `formatCents()` from `utils/money.js`.
 - Styling: use the tokens in `css/tokens.css` and the classes in `css/components.css`. Never hard-code a color (a test enforces this). Check new UI on `#/design`, in both themes, at Extra large text.

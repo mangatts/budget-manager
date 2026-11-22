@@ -16,7 +16,7 @@ Story: E?-S?
 - [ ] Works on phone (Safari + Chrome) and desktop
 - [ ] Works offline (from Sprint 2)
 - [ ] Data survives refresh + browser restart
-- [ ] Unit tests added/updated for logic (validation, insights, crypto, parsers)
+- [ ] Unit tests added/updated for logic (validation, planner math, crypto, backups)
 
 ## Security (docs/SECURITY.md §5)
 - [ ] No `innerHTML` / `eval` / inline scripts or handlers (`bash scripts/check-security.sh` passes)

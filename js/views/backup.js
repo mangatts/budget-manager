@@ -167,18 +167,20 @@ function restoreSection(store) {
   });
 
   function showPreview({ data, summary }) {
-    const current = store.getState().transactions.length;
-    const range = summary.entries
-      ? `${summary.entries} ${summary.entries === 1 ? 'entry' : 'entries'} from ${formatDay(summary.firstDate)} to ${formatDay(summary.lastDate)}`
-      : 'No entries (just your categories and settings)';
+    const { cards: currentCards } = store.getState();
+    const current = currentCards.length;
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const range = `${plural(summary.cards, 'card', 'cards')} and ${plural(summary.checkins, 'check-in', 'check-ins')}`
+      + (summary.checkins ? ` from ${formatDay(summary.firstDate)} to ${formatDay(summary.lastDate)}` : '');
     const restoreButton = el('button', { class: 'btn btn-primary btn-block', type: 'button', id: 'restore-confirm' }, 'Restore this backup');
     const cancel = el('button', { class: 'btn btn-quiet btn-block', type: 'button' }, 'Cancel');
     preview.append(el('div', { class: 'card', id: 'restore-summary' },
       el('h3', {}, 'Ready to restore'),
-      el('p', {}, range, '.'),
+      el('p', {}, range, ', plus your income and fixed expenses.'),
+      summary.legacy ? el('p', { class: 'field-hint' }, 'This backup is from the earlier version of the app. Its debts become cards, its bills become fixed expenses, and its take-home pay becomes income. Spending entries aren\u2019t used anymore.') : null,
       summary.exportedAt ? el('p', { class: 'field-hint' }, `Backup made ${formatDay(localDay(summary.exportedAt))}.`) : null,
       el('p', {}, current
-        ? `This replaces the ${current} ${current === 1 ? 'entry' : 'entries'} on this device. You can undo it right after.`
+        ? `This replaces the ${plural(current, 'card', 'cards')} and everything else on this device. You can undo it right after.`
         : 'Nothing on this device will be lost.'),
       restoreButton,
       cancel,
@@ -192,7 +194,7 @@ function restoreSection(store) {
       if (!outcome.ok) return showToast({ message: outcome.errors.form });
       form.reset();
       showToast({
-        message: `Restored ${summary.entries} ${summary.entries === 1 ? 'entry' : 'entries'}`,
+        message: `Restored ${plural(summary.cards, 'card', 'cards')}`,
         action: { label: 'Undo', run: async () => { await outcome.undo(); return 'Restore undone'; } },
       });
     });

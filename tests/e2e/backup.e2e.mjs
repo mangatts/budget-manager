@@ -1,4 +1,4 @@
-// Encrypted backups: save on one device, restore on a brand-new one (E2-S2, E2-S3, E2-S4).
+// Encrypted backups: save on one device, restore on a brand-new one.
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,7 +10,7 @@ const inStore = (body) => `(async () => {
   const store = await getStore();
   ${body}
 })()`;
-const summary = inStore(`return store.getState().transactions.map((t) => [t.id, t.type, t.amountCents, t.categoryId, t.date, t.note]).sort().join('|');`);
+const summary = inStore(`const s = store.getState(); return JSON.stringify([s.cards, s.checkins, s.incomes, s.expenses].map((l) => l.map((r) => ({ ...r })))) === '[[],[],[],[]]' ? '' : JSON.stringify([s.cards, s.checkins, s.incomes, s.expenses]);`);
 
 async function chooseFile(page, selector, path) {
   const { root } = await page.send('DOM.getDocument', { depth: -1 });
@@ -24,13 +24,16 @@ export async function backupSuite({ page, check, base, launch }) {
   const submit = async (p, id) => { await p.eval(`document.getElementById(${JSON.stringify(id)}).requestSubmit()`); };
   const waitFor = async (p, expr, ms = 8000) => { for (let i = 0; i < ms / 100; i++) { if (await p.eval(expr)) return true; await p.sleep(100); } return false; };
 
-  // Device A has some entries and no backup yet → reminder
+  // Device A has cards, income and check-ins, and no backup yet → reminder
   await page.goto(`${base}#/home`);
   await page.eval(inStore(`
     const today = new Date().toLocaleDateString('en-CA');
-    await store.addTransaction({ type: 'expense', amount: '4.75', categoryId: 'c-dining', date: today, note: 'Coffee ☕ with Sam' });
-    await store.addTransaction({ type: 'income', amount: '1850', categoryId: 'c-paycheck', date: today });
-    await store.addTransaction({ type: 'expense', amount: '86.42', categoryId: 'c-groceries', date: '2026-01-03', note: 'Weekly shop' });
+    const a = await store.addCard({ name: 'Coffee ☕ Card', apr: '24.99', minPayment: '35' });
+    const b = await store.addCard({ name: 'Store card', apr: '29.99', minPayment: '25' });
+    await store.addIncome({ name: 'Paycheck', amount: '1850', frequency: 'biweekly' });
+    await store.addExpense({ name: 'Rent', amount: '1400', dayOfMonth: '1' });
+    await store.saveCheckin({ date: '2026-01-03', balances: { [a.record.id]: '1,234.56', [b.record.id]: '400' } });
+    await store.saveCheckin({ date: today, balances: { [a.record.id]: '1,100', [b.record.id]: '300' } });
   `));
   await page.reload();
   check('Home reminds you when there’s no backup yet', (await value('#backup-reminder'))?.includes('Last backup: Never'));
@@ -53,7 +56,7 @@ export async function backupSuite({ page, check, base, launch }) {
   const made = await waitFor(page, `!!window.__backup && document.querySelector('.toast-message')?.textContent === 'Backup saved'`);
   const fileText = await page.eval(`window.__backup.text()`);
   const file = JSON.parse(fileText);
-  check('Backup saved: encrypted file, notes and amounts not readable inside', made && file.format === 'bm-backup' && file.kdf.iterations === 600000 && !fileText.includes('Coffee') && !fileText.includes('185000'));
+  check('Backup saved: encrypted file, names and amounts not readable inside', made && file.format === 'bm-backup' && file.kdf.iterations === 600000 && !fileText.includes('Coffee') && !fileText.includes('123456'));
   check('"Last backup: Today" and passphrase fields cleared', (await value('#last-backup')) === 'Last backup: Today' && (await page.eval(`document.getElementById('backup-pass').value === ''`)));
   await page.goto(`${base}#/home`);
   check('Reminder goes away after a backup', !(await page.eval(`!!document.getElementById('backup-reminder')`)));
@@ -80,13 +83,14 @@ export async function backupSuite({ page, check, base, launch }) {
     await submit(phone, 'restore-form');
     await waitFor(phone, `!!document.getElementById('restore-summary')`);
     const preview = await phone.eval(`document.getElementById('restore-summary').textContent`);
-    check('Preview before anything changes: 3 entries, date range, nothing lost', preview.includes('3 entries from') && preview.includes('Nothing on this device will be lost') && (await phone.eval(summary)) === '', preview);
+    check('Preview before anything changes: 2 cards, 2 check-ins, date range, nothing lost', preview.includes('2 cards and 2 check-ins from') && preview.includes('Nothing on this device will be lost') && (await phone.eval(summary)) === '', preview);
     await phone.eval(`document.getElementById('restore-confirm').click()`);
-    await waitFor(phone, `document.querySelector('.toast-message')?.textContent === 'Restored 3 entries'`);
-    check('Restore on the new phone → identical entries', (await phone.eval(summary)) === original);
-    check('Restored categories and backup date come along', await phone.eval(inStore(`const s = store.getState(); return s.categories.length === 21 && !!s.meta.lastBackupAt;`)));
-    await phone.goto(`${base}#/history`);
-    check('History on the new phone shows them', await phone.eval(`[...document.querySelectorAll('.list-row-link')].some((a) => a.textContent.includes('Coffee ☕ with Sam'))`));
+    await waitFor(phone, `document.querySelector('.toast-message')?.textContent === 'Restored 2 cards'`);
+    check('Restore on the new phone → identical data', (await phone.eval(summary)) === original);
+    check('Backup date comes along', await phone.eval(inStore(`return !!store.getState().meta.lastBackupAt;`)));
+    await phone.goto(`${base}#/home`);
+    await phone.sleep(300);
+    check('Home on the new phone shows the cards', (await phone.eval(`document.getElementById('pay-list')?.textContent ?? ''`)).includes('Coffee ☕ Card'));
 
     // Corrupted file
     await phone.goto(`${base}#/backup`);
@@ -98,21 +102,21 @@ export async function backupSuite({ page, check, base, launch }) {
     check('A changed/corrupted file is refused, nothing changes', (await phone.eval(`document.getElementById('restore-pass-error').textContent`)).includes('file has been changed') && (await phone.eval(summary)) === original);
 
     // Replace existing data, then Undo
-    await phone.eval(inStore(`await store.addTransaction({ type: 'expense', amount: '9.99', categoryId: 'c-shopping', date: new Date().toLocaleDateString('en-CA'), note: 'Added later' });`));
+    await phone.eval(inStore(`await store.addCard({ name: 'Added later', apr: '9.99', minPayment: '10' });`));
     await phone.goto(`${base}#/home`); await phone.goto(`${base}#/backup`);
     await waitFor(phone, `!!document.getElementById('restore-file')`);
     await chooseFile(phone, '#restore-file', good);
     await setValue(phone, 'restore-pass', PASS);
     await submit(phone, 'restore-form');
     await waitFor(phone, `!!document.getElementById('restore-summary')`);
-    check('Preview warns it replaces what’s here', (await phone.eval(`document.getElementById('restore-summary').textContent`)).includes('replaces the 4 entries'));
+    check('Preview warns it replaces what’s here', (await phone.eval(`document.getElementById('restore-summary').textContent`)).includes('replaces the 3 cards'));
     await phone.eval(`document.getElementById('restore-confirm').click()`);
     // Wait for the data itself (an earlier "Restored" message may still be on screen).
-    await waitFor(phone, inStore(`return store.getState().transactions.length === 3;`));
+    await waitFor(phone, inStore(`return store.getState().cards.length === 2;`));
     const afterRestore = await phone.eval(summary);
     await phone.eval(`document.querySelector('.toast-action').click()`);
     await waitFor(phone, `document.querySelector('.toast-message')?.textContent === 'Restore undone'`);
-    check('Undo restore brings back what was there (4 entries)', afterRestore === original && (await phone.eval(summary)).includes('Added later'));
+    check('Undo restore brings back what was there (3 cards)', afterRestore === original && (await phone.eval(summary)).includes('Added later'));
     await phone.reload();
     check('Undo is saved, not just on screen', (await phone.eval(summary)).includes('Added later'));
     check('New phone: no errors or CSP violations', phone.problems.length === 0, phone.problems.join(' | '));

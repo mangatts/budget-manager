@@ -1,5 +1,5 @@
 // App shell: tabs, routing, history, keyboard, and layout at phone width (E0-S1).
-const ROUTES = ['add', 'history', 'tips', 'more'];
+const ROUTES = [['checkin', 'Check-in'], ['setup', 'Setup'], ['more', 'More']];
 
 const state = (page) => page.eval(`({
   hash: location.hash,
@@ -17,19 +17,17 @@ export async function shellSuite({ page, check, base }) {
   let s = await state(page);
   check('Loads on Home', s.h1 === 'Home' && s.current[0] === 'home' && s.title === 'Budget Manager');
   check('No sideways scroll at 390px', s.scrollW <= s.innerW, `${s.scrollW}/${s.innerW}`);
-  check('All 5 tabs on screen, each ≥ 48×48px', s.tabsFit);
+  check('All 4 tabs on screen, each ≥ 48×48px', s.tabsFit);
 
-  for (const route of ROUTES) {
+  for (const [route, heading] of ROUTES) {
     await page.eval(`document.querySelector('nav a[data-route="${route}"]').click()`);
     await page.sleep(150);
     s = await state(page);
-    // Focus moves to the new heading, except on Add, where it goes to Amount so the keypad opens.
-    const expectedFocus = route === 'add' ? 'INPUT.input input-money' : 'H1';
-    check(`Tap "${route}" → screen, URL, aria-current, title, focus`, s.hash === `#/${route}` && s.h1.toLowerCase() === route && s.current.join() === route && s.title === `${s.h1} · Budget Manager` && s.focused === expectedFocus, s.focused);
+    check(`Tap "${route}" → screen, URL, aria-current, title, focus`, s.hash === `#/${route}` && s.h1 === heading && s.current.join() === route && s.title === `${heading} · Budget Manager` && s.focused === 'H1', s.focused);
   }
 
   await page.eval('history.back()'); await page.sleep(250);
-  check('Back → Tips', (await state(page)).h1 === 'Tips');
+  check('Back → Setup', (await state(page)).h1 === 'Setup');
   await page.eval('history.forward()'); await page.sleep(250);
   check('Forward → More', (await state(page)).h1 === 'More');
   await page.reload();
@@ -41,14 +39,14 @@ export async function shellSuite({ page, check, base }) {
   check('Markup in the URL is never rendered', (await state(page)).h1 === 'Home' && !(await page.eval(`!!document.querySelector('main img')`)));
 
   // Keyboard, from a fresh load
-  await page.goto(`${base}#/tips`); await page.reload();
+  await page.goto(`${base}#/setup`); await page.reload();
   await page.key('Tab', 'Tab', 9);
   check('First Tab focuses "Skip to content"', (await state(page)).focused.includes('skip-link'));
   await page.key('Enter', 'Enter', 13);
   s = await state(page);
-  check('Skip link → focus main, URL unchanged', s.focused.startsWith('MAIN') && s.hash === '#/tips');
-  // Tab forward (past whatever the screen contains) to the History tab, then Enter.
-  for (let i = 0; i < 30 && !(await page.eval(`document.activeElement?.dataset?.route === 'history'`)); i++) await page.key('Tab', 'Tab', 9);
+  check('Skip link → focus main, URL unchanged', s.focused.startsWith('MAIN') && s.hash === '#/setup');
+  // Tab forward (past whatever the screen contains) to the Check-in tab, then Enter.
+  for (let i = 0; i < 30 && !(await page.eval(`document.activeElement?.dataset?.route === 'checkin'`)); i++) await page.key('Tab', 'Tab', 9);
   await page.key('Enter', 'Enter', 13);
-  check('Tab to "History" + Enter navigates', (await state(page)).hash === '#/history');
+  check('Tab to "Check-in" + Enter navigates', (await state(page)).hash === '#/checkin');
 }

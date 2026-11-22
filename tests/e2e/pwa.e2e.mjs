@@ -42,7 +42,7 @@ export async function pwaSuite({ page, check, base }) {
   await page.sleep(300);
   const more = await page.eval(`({ install: document.getElementById('install-body')?.textContent ?? '', storage: document.getElementById('storage-status')?.textContent ?? '' })`);
   check('More explains how to install', more.install.length > 40, more.install.slice(0, 80));
-  check('More shows whether data is protected, and the entry count', /Protected|Not protected yet/.test(more.storage) && /\d+ (entry|entries)/.test(more.storage), more.storage);
+  check('More shows whether data is protected, and what’s stored', /Protected|Not protected yet/.test(more.storage) && /\d+ cards? · \d+ check-ins?/.test(more.storage), more.storage);
   if (/127\.0\.0\.1|localhost/.test(base)) check('Local development skips the service worker unless asked', !(await page.eval('navigator.serviceWorker.controller')));
 
   // Real offline test on a separate server we can stop.
@@ -63,7 +63,7 @@ export async function pwaSuite({ page, check, base }) {
       for (const key of await caches.keys()) for (const req of await (await caches.open(key)).keys()) urls.push(req.url);
       return { count: urls.length, foreign: urls.filter((u) => !u.startsWith(location.origin)) };
     })()`);
-    check('Caches only this app’s own files', cached.count >= 30 && cached.foreign.length === 0, `${cached.count} files, foreign: ${cached.foreign}`);
+    check('Caches only this app’s own files', cached.count >= 25 && cached.foreign.length === 0, `${cached.count} files, foreign: ${cached.foreign}`);
 
     // Publish a new version: the app offers "Update", and only switches when asked.
     const swPath = join(site, 'sw.js');
@@ -103,16 +103,18 @@ export async function pwaSuite({ page, check, base }) {
     const offline = await page.eval(`({ h1: document.querySelector('main h1')?.textContent, font: [...document.fonts].some((f) => f.family.includes('Next') && f.status === 'loaded') })`);
     check('Server stopped → reload → app still opens, with its fonts', down && offline.h1 === 'Home' && offline.font, JSON.stringify(offline));
 
-    await page.goto(`${offlineBase}#/add`);
-    await page.eval(`document.getElementById('amount').focus()`);
-    await page.type('3.50');
-    await page.eval(`document.getElementById('category-c-dining').click()`);
-    await page.eval(`document.querySelector('form button[type="submit"]').click()`);
+    await page.goto(`${offlineBase}#/card/new`);
     await page.sleep(300);
-    const saved = await page.eval(`(async () => { const { getStore } = await import(new URL('js/appStore.js', location.href)); return (await getStore()).getState().transactions.some((t) => t.amountCents === 350); })()`);
-    check('Offline: adding an entry still saves', saved);
-    await page.goto(`${offlineBase}#/history`);
-    check('Offline: History shows it', (await page.eval(`[...document.querySelectorAll('.list-row-link')].some((a) => a.textContent.includes('3.50'))`)));
+    await page.eval(`document.getElementById('card-name').value = 'Offline card'`);
+    await page.eval(`document.getElementById('card-apr').value = '19.99'`);
+    await page.eval(`document.getElementById('card-min').value = '3.50'`);
+    await page.eval(`document.getElementById('card-form').requestSubmit()`);
+    await page.sleep(300);
+    const saved = await page.eval(`(async () => { const { getStore } = await import(new URL('js/appStore.js', location.href)); return (await getStore()).getState().cards.some((c) => c.minPaymentCents === 350); })()`);
+    check('Offline: adding a card still saves', saved);
+    await page.goto(`${offlineBase}#/setup`);
+    await page.sleep(300);
+    check('Offline: Setup shows it', (await page.eval(`(document.getElementById('card-list')?.textContent ?? '').includes('Offline card')`)));
   } finally {
     server.kill();
     rmSync(site, { recursive: true, force: true });
