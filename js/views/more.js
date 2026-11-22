@@ -7,10 +7,6 @@ import { getStore } from '../appStore.js';
 import { lastBackupText } from './backup.js';
 import { backupReminder } from '../ui/backupReminder.js';
 
-const COMING_SOON = [
-  ['Bank statement import', 'Bring in transactions from a CSV file. Sprint 8.'],
-];
-
 const linkRow = (href, title, detail, id) => el('li', {},
   el('a', { class: 'list-row list-row-link', href, id },
     el('span', { class: 'list-row-main' }, el('span', {}, title), el('span', { class: 'list-row-sub' }, detail)),
@@ -79,15 +75,16 @@ function formatBytes(bytes) {
 function storageSection() {
   const status = el('div', { class: 'section', id: 'storage-status' }, el('p', { class: 'lead' }, 'Checking\u2026'));
   Promise.all([storageStatus(), getStore().catch(() => null)]).then(async ([info, store]) => {
-    const entries = store?.getState().transactions.length ?? 0;
+    const cards = store?.getState().cards.length ?? 0;
+    const checkins = store?.getState().checkins.length ?? 0;
     // Ask again here: browsers often grant it once the app is installed or used regularly.
-    const persisted = info.persisted || (entries > 0 && await requestPersistence());
+    const persisted = info.persisted || (cards > 0 && await requestPersistence());
     clear(status);
     status.append(
       persisted
         ? el('p', {}, el('span', { class: 'pill pill-good' }, '\u2713 Protected'), ' Your browser won\u2019t clean up this data automatically.')
         : el('p', {}, el('span', { class: 'pill pill-warning' }, '\u26a0 Not protected yet'), ' Install the app to protect it, and keep a backup.'),
-      el('p', { class: 'field-hint' }, `${entries} ${entries === 1 ? 'entry' : 'entries'}${formatBytes(info.usage) ? ` \u00b7 ${formatBytes(info.usage)} used` : ''} \u00b7 stored only on this device`),
+      el('p', { class: 'field-hint' }, `${cards} ${cards === 1 ? 'card' : 'cards'} \u00b7 ${checkins} ${checkins === 1 ? 'check-in' : 'check-ins'}${formatBytes(info.usage) ? ` \u00b7 ${formatBytes(info.usage)} used` : ''} \u00b7 stored only on this device`),
     );
   });
   return el('section', { class: 'section', 'aria-labelledby': 'storage-title' }, el('h2', { class: 'section-title', id: 'storage-title' }, 'Your data'), status);
@@ -122,31 +119,13 @@ export function moreView() {
       el('div', { class: 'card', 'aria-label': 'Preview' },
         el('p', { class: 'field-hint' }, 'Preview'),
         el('div', { class: 'list-row' },
-          el('div', { class: 'list-row-main' }, el('span', {}, 'Coffee'), el('span', { class: 'list-row-sub' }, 'Dining Out · Today')),
-          el('span', { class: 'money money-out' }, formatCents(-475)),
+          el('div', { class: 'list-row-main' }, el('span', {}, 'Chase Freedom'), el('span', { class: 'list-row-sub' }, '24.99% interest · minimum')),
+          el('span', { class: 'money' }, formatCents(7500)),
         ),
       ),
     ),
 
-    el('section', { class: 'section', 'aria-labelledby': 'money-title' },
-      el('h2', { class: 'section-title', id: 'money-title' }, 'Your money'),
-      el('ul', { class: 'list' },
-        linkRow('#/profile', 'Pay, savings, and 401(k)', 'Makes your numbers more accurate', 'profile-link'),
-        linkRow('#/bills', 'Bills', 'Rent, phone, subscriptions', 'bills-link'),
-        linkRow('#/debts', 'Debts', 'Credit cards and loans', 'debts-link'),
-        linkRow('#/goals', 'Goals', 'What you’re saving for', 'goals-link'),
-        linkRow('#/whatif', 'What if…', 'See how small changes add up', 'whatif-link'),
-      ),
-    ),
-    el('section', { class: 'section', 'aria-labelledby': 'import-title' },
-      el('h2', { class: 'section-title', id: 'import-title' }, 'Less typing'),
-      el('ul', { class: 'list' }, linkRow('#/import', 'Import a statement', 'Add a month of spending from your bank’s CSV', 'import-link')),
-    ),
     backupsSection(),
-    el('section', { class: 'section', 'aria-labelledby': 'cats-title' },
-      el('h2', { class: 'section-title', id: 'cats-title' }, 'Categories'),
-      el('ul', { class: 'list' }, linkRow('#/categories', 'Manage categories', 'Rename, add, hide, or delete', 'manage-categories')),
-    ),
     installSection(),
     storageSection(),
     el('section', { class: 'section', 'aria-labelledby': 'danger-title' },
@@ -154,13 +133,5 @@ export function moreView() {
       el('ul', { class: 'list' }, linkRow('#/wipe', 'Delete everything on this device', 'Offers a backup first', 'wipe-link')),
     ),
 
-    el('section', { class: 'section', 'aria-labelledby': 'soon-title' },
-      el('h2', { class: 'section-title', id: 'soon-title' }, 'Coming soon'),
-      el('ul', { class: 'list' },
-        COMING_SOON.map(([title, detail]) => el('li', { class: 'list-row' },
-          el('div', { class: 'list-row-main' }, el('span', {}, title), el('span', { class: 'list-row-sub' }, detail)),
-        )),
-      ),
-    ),
   );
 }

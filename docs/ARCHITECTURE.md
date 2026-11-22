@@ -1,353 +1,90 @@
 # Budget Manager — Architecture
 
-A personal budget manager built with plain HTML, CSS, and JavaScript. You should be able to use it every day on a laptop and a phone, and your data should never reset. Instead of making you set "expected vs. actual" budgets, it compares your spending to **industry benchmarks** and **learns from your habits** to tell you where to cut back.
+A small, private app for credit cards and monthly cash flow, built with plain HTML, CSS, and JavaScript. No server, no build step, no third-party runtime code.
 
-**Related docs**
-- [PRODUCT.md](PRODUCT.md): what makes us different (Next Best Step, Safe to Spend, Cut Plan, What-If)
-- [INSIGHTS.md](INSIGHTS.md): how the "smart coach" works (benchmarks → learning → optional AI)
-- [SECURITY.md](SECURITY.md): security plan based on NIST guidelines
-- [BACKLOG.md](BACKLOG.md): Agile process, epics, user stories, sprint plan
+**Related docs:** [PRODUCT.md](PRODUCT.md) · [SECURITY.md](SECURITY.md) · [BACKLOG.md](BACKLOG.md)
 
----
-
-## 0. Decisions (locked in)
+## 1. Decisions
 
 | Topic | Decision |
 |---|---|
-| Currency | **USD only** (`$`). No currency picker. |
-| Sync | **Not now.** Everything is stored on the device. Data moves between devices with an encrypted Export/Import. |
-| Budget style | **No "expected vs. actual" budgets.** Spending is measured against **industry benchmarks** (50/30/20 rule, BLS/HUD guidance) and the user's own learned patterns. |
-| Smart coach | Starts with **clear rules** (the examples in INSIGHTS.md), then **learns on-device** from user spending and feedback. An optional AI coach may come later. |
-| Bank statements | Upload a CSV, then **the user confirms the category for every row**. Suggestions are allowed; auto-filing is not. |
-| Design | **Usable by every age group**: big, clear, plain-language, accessible. Use design skills when building the UI. |
-| Process | **Agile** (Scrum-lite, 1-week sprints). See BACKLOG.md. |
-| Security | **NIST-aligned** (CSF 2.0 + SSDF SP 800-218), with OWASP checklists for web specifics. See SECURITY.md. |
+| Scope | Income, fixed expenses, cards, and dated balance check-ins. No spending entries. |
+| Payoff method | Minimums on every card, the rest to the highest APR (avalanche). |
+| Currency | USD only. Money is integer cents; APR is integer basis points (24.99% = 2499). |
+| Storage | IndexedDB on the device. Encrypted backups move data between devices. No sync. |
+| Hosting | GitHub Pages (HTTPS). CSP in a `<meta>` tag. |
+| Security | NIST CSF 2.0 + SSDF, OWASP checklists. See SECURITY.md. |
 
----
-
-## 1. Goals
-
-| Goal | What it means |
-|---|---|
-| **Daily use** | Add an expense in under 5 seconds. Opens like an app from the home screen or dock. |
-| **Data never resets** | Data survives refreshes, browser restarts, and updates to the app, and there's a backup if the browser loses it anyway. |
-| **Helpful, not bossy** | Tells you *where* to save and *how much*, in plain words, without making you set up budgets. |
-| **Private & secure** | No accounts, no server, no trackers. Data never leaves the device unless you export it. |
-| **Simple stack** | Vanilla HTML/CSS/JS with ES modules. No build step and no third-party runtime dependencies. |
-
----
-
-## 2. Making the data stick
-
-| Option | Survives refresh | Risk of loss | Works on phone | Verdict |
-|---|---|---|---|---|
-| JS variables only | ❌ | Lost on every refresh | ✅ | No |
-| `localStorage` | ✅ | ~5 MB cap; Safari can wipe it after 7 days without a visit | ✅ | Small UI preferences only |
-| **IndexedDB** | ✅ | Large capacity; still in the browser, so it can be cleared | ✅ | **Primary store** |
-| File System Access API | ✅ | Very safe | ❌ Chrome/Edge desktop only | Maybe later |
-| Cloud DB | ✅ | Safest | ✅ | Not planned |
-
-### 4 layers of protection
-1. **IndexedDB** as the main database in the browser.
-2. **`navigator.storage.persist()`** asks the browser not to evict the data.
-3. **Installed PWA**: works offline, and on iPhone it avoids Safari's 7-day wipe.
-4. **Encrypted backups**: one-tap export/import, plus a "last backup: X days ago" reminder.
-
-### Things that WILL wipe data
-- Opening `index.html` as a `file://` URL. **Always use `http://localhost` or HTTPS.**
-- Clearing site data, using private/incognito windows, or changing the URL or port.
-
-### Hosting
-- **Local dev:** `python3 -m http.server 5500`
-- **Everyday use:** **GitHub Pages** (free, HTTPS, stable URL). Install the PWA from there.
-  - *Security note:* GitHub Pages can't set custom HTTP headers, so the CSP goes in a `<meta>` tag. If headers become necessary, move to Cloudflare Pages or Netlify (both free). See SECURITY.md.
-
----
-
-## 3. High-level architecture
+## 2. Layers
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  UI layer (views/)  – textContent only, never innerHTML   │
-│  Home · Add · History · Tips · Import · Settings          │
-└──────────────▲───────────────────────┬────────────────────┘
+│ Views (views/)  textContent only, never innerHTML         │
+│ Home · Check-in · Setup (+ card/income/expense forms)     │
+│ More · Backups · Delete everything · #/design             │
+└──────────────▲───────────────────────┬───────────────────┘
                │ re-render             │ user actions
-┌──────────────┴───────────────────────▼────────────────────┐
-│  Store (store.js) – state + actions + subscribe           │
-└──────────────▲───────────────────────┬────────────────────┘
+┌──────────────┴───────────────────────▼───────────────────┐
+│ Store (store.js): state + validated actions, each → undo │
+└──────────────▲───────────────────────┬───────────────────┘
                │                       │
-┌──────────────┴───────────────────────▼────────────────────┐
-│  Services                                                 │
-│  ┌─ insights/  (the "smart coach", see INSIGHTS.md) ────┐ │
-│  │  benchmarks.js  L1: industry rules (50/30/20, etc.)  │ │
-│  │  patterns.js    L2: learned personal baselines       │ │
-│  │  learner.js     L3: learns from 👍/👎 feedback        │ │
-│  │  engine.js      runs all, scores, ranks the tips     │ │
-│  └──────────────────────────────────────────────────────┘ │
-│  statementImport/  CSV → validate → review queue          │
-│  backup.js         encrypted export / import              │
-│  crypto.js         Web Crypto (AES-256-GCM, PBKDF2)       │
-│  validate.js       schema checks on ALL incoming data     │
-│  migrations.js     upgrade old data shapes                │
-└──────────────▲───────────────────────┬────────────────────┘
-               │                       │
-┌──────────────┴───────────────────────▼────────────────────┐
-│  Repository interface → IndexedDB adapter                 │
-└───────────────────────────────────────────────────────────┘
-
-  sw.js          → offline cache (versioned; self-update)
-  manifest.json  → installable app
-  CSP <meta>     → blocks inline/third-party scripts
+┌──────────────┴──────────┐  ┌─────────▼───────────────────┐
+│ services/planner.js     │  │ services/validate.js        │
+│ pure math: monthly pay, │  │ every form input            │
+│ minimums, avalanche,    │  │ services/backup.js + crypto │
+│ trend, payoff estimate  │  │ services/legacy.js (v1 data)│
+└─────────────────────────┘  └─────────────▲───────────────┘
+                                           │
+┌──────────────────────────────────────────▼───────────────┐
+│ Repository (allow-listed stores) → IndexedDB adapter     │
+└──────────────────────────────────────────────────────────┘
+  sw.js → offline cache · manifest.json → installable · CSP → no inline/third-party code
 ```
 
-**Key rules**
-1. The UI never talks to IndexedDB directly.
-2. **All data from outside** (form input, CSV files, backup files) goes through `validate.js` before it is stored.
-3. **The insights engine is pure functions** (data in, tips out). That makes it easy to test, and the rules can be swapped for smarter models later without touching the UI.
+Rules: the UI never touches IndexedDB; all outside data goes through `validate.js` or the backup validator; the planner is pure functions (data in, plan out).
 
----
-
-## 4. Data model
-
-All money is stored as **integer cents** (`1250` = $12.50).
+## 3. Data model (database v8)
 
 ```js
-// transactions
-{
-  id: "uuid",
-  type: "expense" | "income",
-  amountCents: 1250,
-  categoryId: "uuid",
-  date: "2026-10-28",
-  note: "Lunch",                       // max 200 chars
-  merchant: "Chipotle" | null,         // cleaned name (imports)
-  source: "manual" | "import",
-  importId: null | "uuid",
-  fingerprint: null | "sha256-hex",    // duplicate detection
-  createdAt: 1761650000000,
-  updatedAt: 1761650000000
-}
-
-// categories
-{
-  id: "uuid",
-  name: "Dining Out",
-  type: "expense" | "income",
-  bucket: "need" | "want" | "savings", // used by the 50/30/20 benchmark
-  benchmarkKey: "food_away",           // links to benchmark table
-  icon: "🍽️",
-  order: 7,                            // display order
-  archived: false
-}
-// Default ids are stable ("c-dining") so future migrations can find them.
-
-// profile (single record; optional, makes benchmarks more accurate)
-{
-  key: "profile",
-  monthlyTakeHomeCents: 450000 | null, // null → estimated from income entries
-  householdSize: 1 | null
-}
-
-// insightFeedback (what the app learns from)
-{
-  id: "uuid",
-  insightType: "pace_over_benchmark",
-  categoryId: "uuid",
-  shownAt: 1761650000000,
-  response: "helpful" | "not_helpful" | "dismissed" | "doing_it",
-  month: "2026-10"
-}
-
-// learnerState (on-device learned weights and baselines)
-{ key: "weights",   value: { "pace_over_benchmark": 1.2, "small_stuff": 0.6, ... } }
-{ key: "baselines", value: { "<categoryId>": { median: 41000, mad: 6000, months: 4 } } }
-
-// merchantRules (from YOUR confirmations; suggestions only)
-{ id: "uuid", pattern: "CHIPOTLE", categoryId: "uuid", timesConfirmed: 3 }
-
-// imports + pendingTransactions (bank statement review queue)
-{ id, fileName, uploadedAt, rowCount, status: "reviewing" | "done" }
-{ id, importId, date, amountCents, type, merchant, rawDescription /* masked */,
-  suggestedCategoryId, decision: "pending" | "approved" | "skipped" }
-
-// meta (settings)
-{ key: "monthlyTakeHomeCents", value: 450000 | null }  // More → Your money
-{ key: "savingsPercent", value: 20 }                  // 0–50, default 20 (50/30/20)
-{ key: "schemaVersion", value: 1 }
-{ key: "lastBackupAt",  value: 1761650000000 }
-{ key: "textSize",      value: "normal" | "large" | "extra-large" }
+// cards
+{ id, name, limitCents: 500000 | null, aprBps: 2499, minPaymentCents: 3500, createdAt, updatedAt }
+// checkins (keyPath "date": one per day)
+{ date: "2026-11-22", balances: [{ cardId, balanceCents }], createdAt }
+// incomes
+{ id, name, amountCents, frequency: "weekly" | "biweekly" | "semimonthly" | "monthly", createdAt, updatedAt }
+// expenses
+{ id, name, amountCents, dayOfMonth: 1–31 | null, createdAt, updatedAt }
+// meta
+{ key: "carriedOver", value: 1 }      // v1 data already moved over
+{ key: "lastBackupAt", value: 1761650000000 }
 ```
 
-// bills (database v2): recurring bills for Safe to Spend
-{ id: "uuid", name: "Rent", amountCents: 140000, categoryId: "c-housing",
-  dayOfMonth: 1,            // 1–31; the 31st falls on the last day of shorter months
-  active: true, createdAt, updatedAt }
-// A bill counts as paid this month when an entry in its category is within ±10% of its amount.
+Stores from v1 (`transactions`, `categories`, `bills`, `debts`, …) still exist because migrations only move forward. They are read once on first open (debts → cards plus a check-in for today, active bills → expenses, take-home pay → monthly income) and cleared by "Delete everything". Old backups (schema 1–7) restore through the same conversion.
 
-// debts (database v4): Next Best Step and the payoff plan
-{ id: "uuid", name: "Visa", balanceCents: 240000,
-  aprBps: 2499,             // 24.99% as basis points (parsed as text, no floating point)
-  minPaymentCents: 7500,    // 0 = not given
-  createdAt, updatedAt }
+## 4. The plan (services/planner.js)
 
-// goals (database v5): What-If and Next Best Step's last step
-{ id: "uuid", name: "New car", targetCents: 300000, savedCents: 50000, monthlyCents: 25000, createdAt, updatedAt }
+1. Monthly income = Σ amount × paychecks per year ÷ 12 (weekly 52, every 2 weeks 26, twice a month 24, monthly 12).
+2. Each card's balance comes from the newest check-in that includes it.
+3. Minimum due = min(minimum payment, balance).
+4. Left over = income − fixed expenses − minimums. Negative means short.
+5. The extra is given to cards from highest APR to lowest (ties: smaller balance first), up to each card's balance.
+6. Debt-free estimate: month by month, add interest (balance × APR ÷ 12), then pay with the same budget. Shows "won't go down" if it can't finish within 50 years or can't cover the minimums.
+7. Trend = change between the two newest check-ins, counting cards in both.
 
-// meta (Sprint 6): emergencyFundCents (null = skipped, 0 = none yet), employerMatch: full|partial|none|unsure|null,
-//                  skippedSteps: ["step-id", ...] (Next Best Step steps the person chose to skip)
-```
+## 5. Folders
 
 ```
-**Removed:** the `budgets` store (no expected-vs-actual).
-
-**Object stores (built):** v1 `transactions` (indexes `date`, `categoryId`), `categories`, `meta`; **v2 `bills`**; **v3 `challenges`** (Cut Plan: `{ id, categoryId, month, fromCents, targetCents, status: active|skipped|stopped, createdAt }`; results are computed, not stored); **v4 `debts`**; **v5 `goals`**; **v6 `imports`, `pending`, `merchantRules`** (keyed by `pattern`; the queue isn't in backups, rules are); **v7 `feedback`** (`{ id, topic, insightType, month, reaction: up|down|on-it|not-now, categoryIds, baselineCents, createdAt }`). Learned weights are computed from `feedback`, not stored, so there's no separate `learnerState`. Each new version appends a migration in `js/db/indexeddb.js`; backups carry `schemaVersion` and older backups still restore.
-
----
-
-## 5. Folder structure
-
-```
-budget-manager/
-├── index.html
-├── manifest.json           # install as an app (name, icons, colors)
-├── sw.js                   # offline: caches only our files; updates wait for "Update"
-├── css/
-│   ├── tokens.css          # design tokens: colors (light/dark), type, space, text sizes
-│   ├── fonts.css           # self-hosted Atkinson Hyperlegible Next & Mono
-│   ├── base.css            # reset, typography, focus, reduced motion
-│   ├── layout.css          # header, screen column, tab bar
-│   └── components.css      # buttons, fields, choices, lists, money, pills, cards
-├── fonts/                  # .woff2 files + OFL licenses
-├── js/
-│   ├── prefs-boot.js       # applies saved text size/theme before first paint
-│   ├── app.js
-│   ├── router.js
-│   ├── store.js            # state + validated actions (each returns undo)
-│   ├── appStore.js         # the app's single store on IndexedDB
-│   ├── db/
-│   │   ├── repository.js   # the only data interface (allowed stores only)
-│   │   ├── indexeddb.js    # versioned migrations; never edit a released one
-│   │   └── memory.js       # same interface, for unit tests
-│   ├── services/
-│   │   ├── insights/       # benchmarkData.js, month.js, safeToSpend.js, split.js (built); tips later
-│   │   │   ├── benchmarks.js
-│   │   │   ├── benchmarkData.js   # the numbers + sources
-│   │   │   ├── patterns.js
-│   │   │   ├── learner.js
-│   │   │   └── engine.js
-│   │   ├── statementImport/
-│   │   │   ├── csvParser.js
-│   │   │   ├── bankFormats.js
-│   │   │   └── suggest.js
-│   │   ├── preferences.js  # text size + theme (allow-listed, localStorage)
-│   │   ├── pwa.js          # service worker, install prompt, storage persistence
-│   │   ├── history.js      # filter/search/group/totals for History
-│   │   ├── categories.js   # defaults, seeded once
-│   │   ├── backup.js       # build, open, and strictly validate backups
-│   │   ├── crypto.js       # AES-256-GCM + PBKDF2 (Web Crypto)
-│   │   ├── validate.js
-│   │   └── migrations.js
-│   ├── ui/
-│   │   └── choiceGroup.js  # shared components built with utils/dom.js
-│   ├── views/
-│   │   ├── design.js       # #/design reference page (hidden route)
-│   │   ├── backup.js       # More → Backups (save / restore)
-│   │   ├── categories.js   # More → Categories (list + edit)
-│   │   ├── wipe.js         # More → Delete everything
-│   │   ├── more.js         # More → Display settings
-│   │   ├── home.js
-│   │   ├── addTransaction.js
-│   │   ├── history.js
-│   │   ├── tips.js
-│   │   ├── importReview.js
-│   │   └── settings.js
-│   └── utils/
-│       ├── money.js        # USD formatting (Intl.NumberFormat)
-│       ├── dates.js
-│       ├── contrast.js     # WCAG contrast ratio (tests + design page)
-│       ├── dom.js          # safe element helpers (no innerHTML)
-│       └── id.js           # crypto.randomUUID()
-├── tests/                  # insights + validation + crypto unit tests
-├── icons/                  # app icons (scripts/make-icons.mjs renders them)
-└── docs/
+index.html · manifest.json · sw.js
+css/      tokens, fonts, base, layout, components
+js/       app.js, router.js, store.js, appStore.js, prefs-boot.js
+  db/       indexeddb.js (migrations), repository.js, memory.js (tests)
+  services/ planner.js, validate.js, legacy.js, backup.js, crypto.js, preferences.js, pwa.js
+  ui/       form.js, choiceGroup.js, toast.js, backupReminder.js
+  views/    home.js, checkin.js, setup.js, more.js, backup.js, wipe.js, design.js
+  utils/    dom.js, money.js, dates.js, id.js, contrast.js
+tests/    unit tests; tests/e2e/ browser checks at 390×844
 ```
 
----
+## 6. Design
 
-## 6. Screens
-
-Bottom tabs: **Home · Add (＋) · History · Tips · More**
-
-1. **Home**: money in, money out, and what's left this month. A **50/30/20 bar** (needs / wants / savings) compared with the recommended split, the **top 2 tips**, and recent transactions.
-2. **Add**: amount (keypad first), money in/out toggle, big category buttons, date (defaults to today), and an optional note.
-3. **History**: grouped by day, filter by month/category, search, edit/delete with undo.
-4. **Tips (Smart Coach)**: all current tips, ranked by how much they'd save. Each has **"Why am I seeing this?"** and 👍 / 👎 / "I'm on it".
-5. **More → Import Statement**: upload a CSV and review/categorize the rows.
-6. **More → Settings**: take-home pay (optional), categories, text size, encrypted backup/restore, storage status, and "Delete all data".
-
----
-
-## 7. Bank statement import
-
-**Principle:** nothing is categorized behind your back.
-
-```
-Upload CSV → Validate (size/type/rows) → Parse → Mask account #s → Dedupe → Review → Approved
-                                                                             │
-                                                     your choices → merchantRules (suggestions)
-```
-
-- Review one row at a time (phone) or as a list (desktop). The suggested category is **highlighted, not pre-selected**.
-- **Add / Skip / Undo** buttons, a "12 of 84 done" counter, and **Finish later** (the queue is saved).
-- "Always use Dining Out for CHIPOTLE?" teaches a merchant rule with one tap.
-- CSV first, starting with common bank layouts plus manual column matching for others. PDF maybe later.
-- The file is read in the browser and never uploaded. Only the needed fields are kept (see SECURITY.md).
-
----
-
-## 8. Design for every age group
-
-| Guideline | How |
-|---|---|
-| Readable | 18px base font, Atkinson Hyperlegible. Text size setting: Normal (18px) / Large (21.6px) / Extra large (25.2px), with no flash on load. |
-| Easy to tap | Targets ≥ 48×48px, well spaced. |
-| Plain language | "Money in / Money out", "Needs / Wants / Savings". No jargon. |
-| Contrast | WCAG 2.2 AA. Never color alone: warnings use an icon + words. |
-| Labels | Every icon has a text label. |
-| Forgiving | Undo after delete. Confirm destructive actions. |
-| Accessible | Semantic HTML, keyboard usable, screen-reader tested, respects "reduce motion". |
-| Light & dark | Follows the device by default; More → Display can force Light or Dark. |
-
-**Design system (built in E0-S2):**
-- **Font:** Atkinson Hyperlegible Next for text and Atkinson Hyperlegible Mono for money, both by the Braille Institute for low-vision readers. Self-hosted, 52 KB total.
-- **Colors:** a deep teal accent and teal-tinted neutrals.
-- **No-shame money colors:** money in is green with a "+". Money out uses the normal text color with a "−".
-- **Status colors:** good, warning and critical, always shown with an icon and words.
-- **Where it lives:** everything is in `css/tokens.css`. Tests enforce AA contrast in both themes and ban hard-coded colors elsewhere.
-- **Live reference:** the `#/design` page.
-- **Charts:** use the **dataviz** skill for every chart (like the 50/30/20 bar).
-
----
-
-## 9. Default categories (editable)
-
-| Category | Bucket | Benchmark key |
-|---|---|---|
-| Housing (rent/mortgage) | Need | `housing` |
-| Utilities | Need | `utilities` |
-| Groceries | Need | `food_home` |
-| Transportation | Need | `transportation` |
-| Gas | Need | `transportation` |
-| Health & Insurance | Need | `healthcare` |
-| Debt Payments (minimums) | Need | `debt` |
-| Dining Out | Want | `food_away` |
-| Shopping | Want | `apparel_misc` |
-| Subscriptions | Want | `entertainment` |
-| Entertainment | Want | `entertainment` |
-| Personal Care | Want | `personal_care` |
-| Gifts | Want | `gifts` |
-| Savings / Investing | Savings | `savings` |
-| Extra Debt Payoff | Savings | `savings` |
-| Other | Want | none |
-
-**Money in:** Paycheck · Side Income · Gifts Received · Refunds · Other Income
+Same design system as before: Atkinson Hyperlegible (self-hosted), deep teal accent, AA contrast in light and dark (tests enforce it), three text sizes, 48px tap targets, status shown with icon + words, Undo on every change. Live reference at `#/design`.

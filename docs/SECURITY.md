@@ -16,22 +16,20 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 
 ## 1. Govern: scope and threat model
 
-**What we protect:** the user's financial history (transactions, income, notes), uploaded bank statements, and backup files.
+**What we protect:** the user's card balances, interest rates, credit limits, income, fixed expenses, and backup files. The app never asks for card or account numbers.
 
 **What we don't have (by design):** no server, no accounts, no passwords to steal, no analytics. That removes most of the attack surface.
 
 | Threat | Example | Main control |
 |---|---|---|
-| Cross-site scripting (XSS) | A malicious note or CSV description like `<img onerror=…>` | `textContent` only + strict CSP + Trusted Types |
-| Malicious file | A huge or malformed CSV or backup file crashes the app or injects data | Size/row limits + schema validation |
-| CSV/formula injection | An exported CSV cell `=HYPERLINK(...)` runs in Excel | Escape `= + - @` on export |
+| Cross-site scripting (XSS) | A malicious card or expense name like `<img onerror=…>` | `textContent` only + strict CSP + Trusted Types |
+| Malicious file | A huge or malformed backup file crashes the app or injects data | Size/record limits + schema validation |
 | Supply chain | A compromised CDN or npm package | **Zero runtime third-party code**. Dev tools pinned + audited |
 | Leaked backup file | A backup emailed or left in Downloads | **Encrypted by default** (AES-256-GCM) |
 | Lost or shared device | Someone opens the app on your phone | Device lock (OS). Optional app lock later |
-| Over-collection | Storing full account numbers from statements | Data minimization + masking |
+| Over-collection | Storing card numbers or bank logins | Never asked for: only a nickname, rate, minimum, limit, and balance |
 | Stale or poisoned cache | An old service worker serving bad code | Versioned SW, same-origin only, update flow |
 | Secrets in repo | An API key committed by accident | No secrets in the client + GitHub secret scanning |
-| Optional AI coach (not built) | Key theft, over-sharing, made-up numbers | Designed and reviewed in [AI_COACH.md](AI_COACH.md) §5 before any code |
 
 ---
 
@@ -68,10 +66,13 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 | Input | Rules |
 |---|---|
 | Amount | Positive, ≤ $1,000,000, at most 2 decimals, converted to integer cents |
-| Date | Valid ISO date, between 2000-01-01 and 1 year ahead |
-| Note / merchant | Trimmed, ≤ 200 chars, control characters stripped |
-| Category | Must exist |
-| CSV upload | `.csv` only, ≤ 5 MB, ≤ 10,000 rows, parse errors reported per row |
+| Amount or zero | Card balance and minimum payment may be $0 (paid off / nothing due) |
+| Interest rate (APR) | 0–99.99%, parsed as text into basis points (no floating point) |
+| Date (check-in) | Valid ISO date, 2000-01-01 to today (no future check-ins) |
+| Names | Trimmed, ≤ 40 chars, control and text-direction characters stripped |
+| Pay frequency | One of weekly, biweekly, semimonthly, monthly |
+| Due day | Optional, whole number 1–31 |
+| Check-in balances | Every current card needs one; ids of unknown cards are ignored |
 | Backup import | Valid format version, decrypts OK, **every record passes the schema** or the import is rejected (no partial corruption) |
 
 ### 2.4 Encryption for backups (NIST-approved algorithms via Web Crypto)
@@ -86,13 +87,13 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 
 - **Restore** (built in E2-S3): ≤ 10 MB file → JSON → decrypt → **every record re-validated and rebuilt from known fields** → preview → one all-or-nothing database transaction → Undo. A single bad record rejects the whole backup.
 - Passphrases are NFC-normalized (same passphrase on any device), min 12 characters, common choices refused.
-- Unencrypted export (CSV for spreadsheets) will be available only behind a clear warning, with formula escaping (not built yet).
+- Backups from the earlier, bigger version (schema 1–7) are validated the same way; only debts, active bills and take-home pay are carried over.
 - **On-device data** is protected by the OS (device lock, disk encryption). An optional app-level lock can be evaluated later. It's deferred because it adds data-loss risk if the user forgets the PIN.
 
-### 2.5 Data minimization (bank imports)
-- Keep only date, amount, cleaned description/merchant, and category.
-- **Mask any long digit runs** (card/account numbers) in descriptions → `****1234`.
-- Don't store the raw file. Drop it from memory after parsing.
+### 2.5 Data minimization
+- Only what the plan needs: card nickname, APR, minimum, optional limit, and balances by date; income amount and frequency; expense name, amount and optional due day.
+- No card numbers, account numbers, bank logins, or statements.
+- Data left from the earlier version (spending entries, categories) is never shown, and "Delete everything" removes it too.
 
 ### 2.6 Privacy
 - No analytics, trackers, ads, or external fonts/CDNs.

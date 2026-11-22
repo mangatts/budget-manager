@@ -5,10 +5,10 @@ import { PREFS_KEY } from '../services/preferences.js';
 
 const CONFIRM_WORD = 'DELETE';
 
-// Clears entries, categories, settings, and reminders. App files stay cached, so it still works offline.
-// On reload the app starts fresh (default categories are added again).
+// Clears every store (including data left from the earlier version), settings, and reminders.
+// App files stay cached, so it still works offline.
 export async function wipeDevice(store) {
-  const result = await store.replaceAll({ transactions: [], categories: [], meta: [] });
+  const result = await store.wipe();
   if (!result.ok) return result;
   try {
     for (const key of Object.keys(localStorage)) if (key.startsWith('bm:') || key === PREFS_KEY) localStorage.removeItem(key);
@@ -19,12 +19,12 @@ export async function wipeDevice(store) {
 export function wipeView() {
   const body = el('div', { class: 'section' }, el('p', { class: 'lead' }, 'Loading…'));
   getStore().then((store) => {
-    const count = store.getState().transactions.length;
+    const { cards, checkins } = store.getState();
     const input = el('input', { class: 'input', id: 'wipe-confirm', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-describedby': 'wipe-hint' });
     const button = el('button', { class: 'btn btn-danger btn-block', type: 'submit', id: 'wipe-button', disabled: true }, 'Delete everything');
     const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
     const form = el('form', { class: 'section', novalidate: true, id: 'wipe-form' },
-      el('p', {}, `This permanently removes ${count} ${count === 1 ? 'entry' : 'entries'}, your categories, and your settings from this device. It can’t be undone.`),
+      el('p', {}, `This permanently removes your ${cards.length} ${cards.length === 1 ? 'card' : 'cards'}, ${checkins.length} ${checkins.length === 1 ? 'check-in' : 'check-ins'}, income, expenses, and settings from this device. It can’t be undone.`),
       el('div', { class: 'card warning-card' },
         el('span', { class: 'pill pill-warning' }, '⚠ Back up first?'),
         el('p', {}, 'A backup lets you bring everything back later, here or on another phone.'),

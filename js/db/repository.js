@@ -1,7 +1,12 @@
 // The only data-access interface the app uses (ARCHITECTURE.md §3). The UI never touches IndexedDB.
 // Wraps an adapter (indexeddb.js in the app, memory.js in tests) and only allows known stores.
 
-export const STORES = Object.freeze(['transactions', 'categories', 'meta', 'bills', 'challenges', 'debts', 'goals', 'imports', 'pending', 'merchantRules', 'feedback']);
+// What the app uses today.
+export const APP_STORES = Object.freeze(['cards', 'checkins', 'incomes', 'expenses', 'meta']);
+// From the earlier, bigger version of the app. Only read once (to carry debts, bills and pay over)
+// and cleared by "Delete everything", so nothing is left behind on the device.
+export const LEGACY_STORES = Object.freeze(['transactions', 'categories', 'bills', 'challenges', 'debts', 'goals', 'imports', 'pending', 'merchantRules', 'feedback']);
+export const STORES = Object.freeze([...APP_STORES, ...LEGACY_STORES]);
 
 export function createRepository(adapter) {
   const check = (store) => {

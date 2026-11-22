@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAmount, cleanNote, validateTransaction } from '../js/services/validate.js';
-import { DEFAULT_CATEGORIES } from '../js/services/categories.js';
+import { parseAmount, parseAmountOrZero, parseApr, cleanNote, validateCard, validateIncome, validateExpense, validateCheckin } from '../js/services/validate.js';
 
 test('parseAmount: common ways people type money', () => {
   const cases = { '12': 1200, '12.5': 1250, '12.50': 1250, '12.': 1200, '.5': 50, '0.01': 1, '$4.75': 475, '$ 4.75': 475, ' 4.75 ': 475, '1,250.00': 125000, '1000000': 100000000, '007.10': 710 };
@@ -36,49 +35,63 @@ test('cleanNote: removes control and text-direction characters, keeps emoji', ()
   assert.equal(cleanNote('<img src=x onerror=alert(1)>'), '<img src=x onerror=alert(1)>'); // stored as text, rendered as text
 });
 
-const ctx = { categories: DEFAULT_CATEGORIES, today: '2026-10-28' };
-const valid = { type: 'expense', amount: '4.75', categoryId: 'c-dining', date: '2026-10-28', note: ' Coffee ' };
-
-test('validateTransaction: accepts a normal expense and income', () => {
-  assert.deepEqual(validateTransaction(valid, ctx), { ok: true, value: { type: 'expense', amountCents: 475, categoryId: 'c-dining', date: '2026-10-28', note: 'Coffee' } });
-  assert.equal(validateTransaction({ ...valid, type: 'income', categoryId: 'c-paycheck' }, ctx).ok, true);
-  assert.equal(validateTransaction({ ...valid, amount: undefined, amountCents: 475 }, ctx).value.amountCents, 475);
+test('parseAmountOrZero: 0 is allowed, junk is not', () => {
+  for (const zero of ['0', '0.00', '$0', '.0']) assert.deepEqual(parseAmountOrZero(zero), { cents: 0 }, zero);
+  assert.deepEqual(parseAmountOrZero('12.50'), { cents: 1250 });
+  assert.ok(parseAmountOrZero('-1').error);
+  assert.ok(parseAmountOrZero('').error);
 });
 
-test('validateTransaction: every field error at once, in plain words', () => {
-  const result = validateTransaction({ type: 'gift', amount: 'x', categoryId: 'nope', date: '2026-02-30', note: 'x'.repeat(212) }, ctx);
-  assert.equal(result.ok, false);
-  assert.deepEqual(result.errors, {
-    type: 'Choose money in or money out',
-    amount: 'Enter an amount like 12.50',
-    categoryId: 'Pick a category',
-    date: 'Pick a date',
-    note: 'Notes can be up to 200 characters. Shorten it by 12.',
-  });
+test('parseApr: text to basis points, no floating point', () => {
+  assert.deepEqual(parseApr('24.99'), { bps: 2499 });
+  assert.deepEqual(parseApr('24.99%'), { bps: 2499 });
+  assert.deepEqual(parseApr('0'), { bps: 0 });
+  assert.deepEqual(parseApr('5.5'), { bps: 550 });
+  assert.match(parseApr('100').error, /99.99/);
+  assert.match(parseApr('abc').error, /like 24.99/);
+  assert.ok(parseApr('1.234').error);
 });
 
-test('validateTransaction: category must match money in/out and not be hidden', () => {
-  assert.equal(validateTransaction({ ...valid, categoryId: 'c-paycheck' }, ctx).errors.categoryId, 'Pick a category');
-  const hidden = DEFAULT_CATEGORIES.map((c) => (c.id === 'c-dining' ? { ...c, archived: true } : c));
-  assert.equal(validateTransaction(valid, { ...ctx, categories: hidden }).errors.categoryId, 'Pick a category');
+test('validateCard: name, rate and minimum are needed; limit is optional', () => {
+  assert.deepEqual(validateCard({ name: ' Chase ', apr: '24.99', minPayment: '35', limit: '' }), { ok: true, value: { name: 'Chase', limitCents: null, aprBps: 2499, minPaymentCents: 3500 } });
+  assert.deepEqual(validateCard({ name: 'Amex', apr: '0', minPayment: '0', limit: '5,000' }).value, { name: 'Amex', limitCents: 500000, aprBps: 0, minPaymentCents: 0 });
+  const { errors } = validateCard({});
+  assert.deepEqual(Object.keys(errors).sort(), ['apr', 'minPayment', 'name']);
+  assert.match(errors.minPayment, /0 if none/);
+  assert.ok(validateCard({ name: 'x'.repeat(41), apr: '1', minPayment: '1' }).errors.name);
+  assert.ok(validateCard({ name: 'A', apr: '1', minPayment: '1', limit: 'lots' }).errors.limit);
+  assert.equal(validateCard(null).ok, false);
 });
 
-test('validateTransaction: date range is 2000-01-01 to one year ahead', () => {
-  const date = (d) => validateTransaction({ ...valid, date: d }, ctx);
-  assert.equal(date('2000-01-01').ok, true);
-  assert.equal(date('1999-12-31').errors.date, 'Pick a date');
-  assert.equal(date('2027-10-28').ok, true);
-  assert.equal(date('2027-10-29').errors.date, 'Pick a date');
-  for (const bad of ['10/28/2026', '2026-10-28T00:00', '', null, 20261028]) assert.equal(date(bad).errors.date, 'Pick a date', String(bad));
+test('validateIncome: amount and a known frequency', () => {
+  assert.deepEqual(validateIncome({ name: 'Paycheck', amount: '1,850', frequency: 'biweekly' }).value, { name: 'Paycheck', amountCents: 185000, frequency: 'biweekly' });
+  const { errors } = validateIncome({ name: '', amount: '0', frequency: 'yearly' });
+  assert.deepEqual(Object.keys(errors).sort(), ['amount', 'frequency', 'name']);
 });
 
-test('validateTransaction: note length counts characters, not bytes', () => {
-  assert.equal(validateTransaction({ ...valid, note: '🍕'.repeat(200) }, ctx).ok, true);
-  assert.equal(validateTransaction({ ...valid, note: '🍕'.repeat(201) }, ctx).errors.note, 'Notes can be up to 200 characters. Shorten it by 1.');
+test('validateExpense: due day is optional, 1 to 31', () => {
+  assert.deepEqual(validateExpense({ name: 'Rent', amount: '1400', dayOfMonth: '1' }).value, { name: 'Rent', amountCents: 140000, dayOfMonth: 1 });
+  assert.equal(validateExpense({ name: 'Groceries', amount: '400', dayOfMonth: '' }).value.dayOfMonth, null);
+  for (const day of ['0', '32', '1.5', 'x']) assert.ok(validateExpense({ name: 'Rent', amount: '1', dayOfMonth: day }).errors.dayOfMonth, day);
 });
 
-test('validateTransaction: rejects bad amountCents and junk input', () => {
-  for (const amountCents of [0, -5, 100000001]) assert.ok(validateTransaction({ ...valid, amount: undefined, amountCents }, ctx).errors.amount);
-  assert.equal(validateTransaction(null, ctx).ok, false);
-  assert.equal(validateTransaction('x', ctx).ok, false);
+const cards = [{ id: 'a', createdAt: 1 }, { id: 'b', createdAt: 1 }];
+test('validateCheckin: every card needs a balance (0 is fine), date not in the future', () => {
+  const ok = validateCheckin({ date: '2026-11-22', balances: { a: '1,200.50', b: '0' } }, { cards, today: '2026-11-22' });
+  assert.deepEqual(ok, { ok: true, value: { date: '2026-11-22', balances: [{ cardId: 'a', balanceCents: 120050 }, { cardId: 'b', balanceCents: 0 }] } });
+  const bad = validateCheckin({ date: '2026-11-23', balances: { a: '' , b: '-4' } }, { cards, today: '2026-11-22' });
+  assert.deepEqual(Object.keys(bad.errors).sort(), ['balance-a', 'balance-b', 'date']);
+  assert.ok(validateCheckin({ date: '2026-02-30', balances: { a: '1', b: '1' } }, { cards, today: '2026-11-22' }).errors.date);
+  // Balances for cards that don't exist are ignored, never stored.
+  assert.deepEqual(validateCheckin({ date: '2026-11-01', balances: { a: '1', b: '2', zzz: '3' } }, { cards, today: '2026-11-22' }).value.balances.map((b) => b.cardId), ['a', 'b']);
+  assert.match(validateCheckin({ date: '2026-11-01', balances: {} }, { cards: [], today: '2026-11-22' }).errors.form, /Add a card/);
+});
+
+test('validateCheckin: a card added after that day may be left blank', () => {
+  const added = new Date(2026, 9, 15, 12).getTime(); // Oct 15 local
+  const list = [{ id: 'a', createdAt: 1 }, { id: 'late', createdAt: added }];
+  const early = validateCheckin({ date: '2026-09-01', balances: { a: '5', late: '' } }, { cards: list, today: '2026-11-22' });
+  assert.deepEqual(early.value.balances, [{ cardId: 'a', balanceCents: 500 }]);
+  const after = validateCheckin({ date: '2026-10-15', balances: { a: '5', late: '' } }, { cards: list, today: '2026-11-22' });
+  assert.ok(after.errors['balance-late']);
 });

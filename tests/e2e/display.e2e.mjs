@@ -22,7 +22,7 @@ export async function displaySuite({ page, check, base }) {
   await page.reload();
   check('Refresh keeps Extra large, applied before <body> (no flash)', near(await rootPx(), 25.2) && (await page.eval('window.__atBody'))?.size === 'xl');
 
-  for (const route of ['home', 'add', 'history', 'tips', 'more', 'design']) {
+  for (const route of ['home', 'checkin', 'setup', 'card/new', 'income/new', 'more', 'design']) {
     await page.goto(`${base}#/${route}`);
     const s = await page.eval(`({
       sw: document.documentElement.scrollWidth, w: innerWidth,

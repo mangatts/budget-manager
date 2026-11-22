@@ -6,8 +6,8 @@ import { lastBackupText } from '../views/backup.js';
 const DAY = 86_400_000;
 const SNOOZE_KEY = 'bm:backup-reminder-snoozed';
 
-export function needsBackupReminder({ transactions, meta }, now = Date.now(), snoozedAt = readSnooze()) {
-  if (!transactions.length) return false;
+export function needsBackupReminder({ cards, incomes, meta }, now = Date.now(), snoozedAt = readSnooze()) {
+  if (!cards.length && !incomes.length) return false;
   if (meta.lastBackupAt && now - meta.lastBackupAt < 14 * DAY) return false;
   return !(snoozedAt && now - snoozedAt < 7 * DAY);
 }
@@ -21,7 +21,7 @@ export function backupReminder(state) {
   const notNow = el('button', { class: 'btn btn-quiet', type: 'button' }, 'Not now');
   const card = el('aside', { class: 'card', id: 'backup-reminder', 'aria-label': 'Backup reminder' },
     el('span', { class: 'pill pill-warning' }, `⚠ Last backup: ${lastBackupText(state.meta.lastBackupAt)}`),
-    el('p', {}, 'A backup keeps your entries safe if this phone is lost, replaced, or its browser data is cleared.'),
+    el('p', {}, 'A backup keeps your cards and numbers safe if this phone is lost, replaced, or its browser data is cleared.'),
     el('div', { class: 'button-row' }, el('a', { class: 'btn btn-primary', href: '#/backup' }, 'Back up now'), notNow),
   );
   notNow.addEventListener('click', () => {

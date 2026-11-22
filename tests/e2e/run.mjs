@@ -5,24 +5,12 @@ import { launch, newProfile } from './browser.mjs';
 import { shellSuite } from './shell.e2e.mjs';
 import { displaySuite } from './display.e2e.mjs';
 import { dataSuite } from './data.e2e.mjs';
-import { addSuite } from './add.e2e.mjs';
-import { historySuite } from './history.e2e.mjs';
 import { pwaSuite } from './pwa.e2e.mjs';
 import { backupSuite } from './backup.e2e.mjs';
-import { categoriesSuite } from './categories.e2e.mjs';
-import { homeSuite } from './home.e2e.mjs';
-import { billsSuite } from './bills.e2e.mjs';
-import { splitSuite } from './split.e2e.mjs';
-import { tipsSuite } from './tips.e2e.mjs';
-import { cutPlanSuite } from './cutplan.e2e.mjs';
-import { debtsSuite } from './debts.e2e.mjs';
-import { nextStepSuite } from './nextstep.e2e.mjs';
-import { whatIfSuite } from './whatif.e2e.mjs';
-import { importSuite } from './import.e2e.mjs';
-import { learningSuite } from './learning.e2e.mjs';
+import { cardsSuite } from './cards.e2e.mjs';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5500/';
-const suites = [['App shell', shellSuite], ['Display settings', displaySuite], ['On-device data', dataSuite], ['Add screen', addSuite], ['History', historySuite], ['Install & offline', pwaSuite], ['Backups', backupSuite], ['Categories & delete', categoriesSuite], ['Home & your money', homeSuite], ['Bills & Safe to Spend', billsSuite], ['50/30/20 split', splitSuite], ['Coach tips', tipsSuite], ['Cut Plan', cutPlanSuite], ['Debts & money profile', debtsSuite], ['Next Best Step & Checkup', nextStepSuite], ['Goals & What-If', whatIfSuite], ['Statement import', importSuite], ['Tips that learn', learningSuite]];
+const suites = [['App shell', shellSuite], ['Display settings', displaySuite], ['On-device data', dataSuite], ['Cards, check-ins & plan', cardsSuite], ['Install & offline', pwaSuite], ['Backups', backupSuite]];
 
 // E2E_ONLY="Add screen" runs one suite while developing; CI always runs them all.
 const only = process.env.E2E_ONLY;

@@ -2,189 +2,108 @@
 // then announced to subscribers. Changes return an undo() so the UI can offer "Undo" instead of
 // "Are you sure?" dialogs.
 
-import { validateTransaction, validateCategory, validateProfile, validateBill, validateChallenge, validateDebt, validateGoal, cleanNote, STEP_IDS } from './services/validate.js';
-import { seedCategoriesOnce } from './services/categories.js';
-import { merchantKey, maskNumbers } from './services/statementImport/clean.js';
-import { REACTIONS, topicOf, tipCategories, usualSpending } from './services/insights/learning.js';
+import { validateCard, validateIncome, validateExpense, validateCheckin } from './services/validate.js';
+import { fromLegacy } from './services/legacy.js';
+import { APP_STORES, LEGACY_STORES } from './db/repository.js';
 import { newId as defaultNewId } from './utils/id.js';
-import { todayLocal, monthKey } from './utils/dates.js';
+import { todayLocal } from './utils/dates.js';
 
 const SAVE_FAILED = { form: 'Couldn’t save on this device. Check that the browser isn’t in private mode and has free space, then try again.' };
 
-// Newest day first; within a day, most recently added first.
-const byNewest = (a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1);
+// Backups accept up to these many (services/backup.js), so the app never makes more.
+export const LIMITS = Object.freeze({ cards: 100, incomes: 50, expenses: 500, checkins: 5000 });
+
+const byName = (a, b) => a.name.localeCompare(b.name);
+const SORTS = {
+  cards: (a, b) => b.aprBps - a.aprBps || byName(a, b), // highest interest first
+  incomes: (a, b) => a.createdAt - b.createdAt,
+  expenses: (a, b) => (a.dayOfMonth ?? 99) - (b.dayOfMonth ?? 99) || byName(a, b),
+  checkins: (a, b) => (a.date < b.date ? 1 : -1), // newest first
+};
+const KEY = { cards: 'id', incomes: 'id', expenses: 'id', checkins: 'date' };
+const LISTS = ['cards', 'checkins', 'incomes', 'expenses'];
 
 // Stored rows → app state (sorted lists, meta as a key → value object).
-const shape = ({ categories, transactions, meta, bills = [], challenges = [], debts = [], goals = [], imports = [], pending = [], merchantRules = [], feedback = [] }) => ({
-  categories: [...categories].sort((a, b) => a.order - b.order),
-  transactions: [...transactions].sort(byNewest),
+const shape = ({ cards = [], checkins = [], incomes = [], expenses = [], meta = [] }) => ({
+  cards: [...cards].sort(SORTS.cards),
+  checkins: [...checkins].sort(SORTS.checkins),
+  incomes: [...incomes].sort(SORTS.incomes),
+  expenses: [...expenses].sort(SORTS.expenses),
   meta: Object.fromEntries(meta.map((m) => [m.key, m.value])),
-  bills: [...bills].sort(byDueDay),
-  challenges: [...challenges].sort((a, b) => b.createdAt - a.createdAt),
-  debts: [...debts].sort(byRate),
-  goals: [...goals].sort(byCreated),
-  imports: [...imports].sort((a, b) => a.uploadedAt - b.uploadedAt),
-  pending: [...pending].sort(byOrder),
-  merchantRules: [...merchantRules],
-  feedback: [...feedback].sort(byCreated),
 });
 
-const byDueDay = (a, b) => a.dayOfMonth - b.dayOfMonth || a.name.localeCompare(b.name);
-const byRate = (a, b) => b.aprBps - a.aprBps || a.name.localeCompare(b.name); // highest interest first
-// Backups accept up to this many (services/backup.js), so the app never makes more.
-const MAX_GOALS = 100;
-const MAX_DEBTS = 100;
-const MAX_FEEDBACK = 4000;
-const byCreated = (a, b) => a.createdAt - b.createdAt;
-const byOrder = (a, b) => a.order - b.order;
-const SORTS = { debts: byRate, goals: byCreated };
-const STATE_STORES = ['categories', 'transactions', 'meta', 'bills', 'challenges', 'debts', 'goals', 'imports', 'pending', 'merchantRules', 'feedback'];
+const VALIDATORS = { cards: validateCard, incomes: validateIncome, expenses: validateExpense };
+const GONE = { cards: 'This card no longer exists.', incomes: 'This income no longer exists.', expenses: 'This expense no longer exists.', checkins: 'This check-in no longer exists.' };
 
 export function createStore({ repo, now = Date.now, newId = defaultNewId, today = todayLocal }) {
-  let state = { ready: false, categories: [], transactions: [], meta: {}, bills: [], challenges: [], debts: [], goals: [], imports: [], pending: [], merchantRules: [], feedback: [] };
+  let state = { ready: false, ...shape({}) };
   const listeners = new Set();
-
   const set = (changes) => {
     state = { ...state, ...changes };
     for (const fn of listeners) fn(state);
   };
-  const withTransaction = (record) => [...state.transactions.filter((t) => t.id !== record.id), record].sort(byNewest);
-  const withoutTransaction = (id) => state.transactions.filter((t) => t.id !== id);
 
-  async function restore(record) {
-    await repo.put('transactions', record);
-    set({ transactions: withTransaction(record) });
-  }
-
-  const usedBy = (categoryId) => state.transactions.filter((t) => t.categoryId === categoryId).length;
-  const billsUsing = (categoryId) => state.bills.filter((b) => b.categoryId === categoryId).length;
-  // A category is "in use" if entries OR bills point at it; it then can't be deleted or switch money in/out.
-  // Only ACTIVE challenges lock a category; skipped/stopped ones are cleared when it's deleted or retyped.
-  const activeChallenges = (categoryId) => state.challenges.filter((c) => c.categoryId === categoryId && c.status === 'active').length;
-  const inUse = (categoryId) => usedBy(categoryId) + billsUsing(categoryId) + activeChallenges(categoryId) > 0;
-  async function clearOldChallenges(categoryId) {
-    const old = state.challenges.filter((c) => c.categoryId === categoryId && c.status !== 'active');
-    for (const c of old) await repo.delete('challenges', c.id);
-    if (old.length) set({ challenges: state.challenges.filter((c) => !old.includes(c)) });
-  }
-
-  // Import review: when the last row is handled the import is done; undo of a row reopens it.
-  async function setImportStatus(importId, status) {
-    const record = state.imports.find((i) => i.id === importId);
-    if (!record || record.status === status) return;
-    const next = { ...record, status };
-    await repo.put('imports', next);
-    set({ imports: state.imports.map((i) => (i.id === importId ? next : i)) });
-  }
-  async function finishIfDone(importId) {
-    if (!state.pending.some((p) => p.importId === importId && p.decision === 'pending')) {
-      try { await setImportStatus(importId, 'done'); } catch { /* still reviewable; the next action retries */ }
-    }
-  }
-  async function reopen(row, transactionId) {
-    if (!state.pending.some((p) => p.id === row.id)) throw refuse('That import was cancelled, so this can\u2019t be undone.');
-    const decided = state.pending.find((p) => p.id === row.id);
-    try {
-      await repo.put('pending', row);
-    } catch {
-      throw refuse(SAVE_FAILED.form);
-    }
-    try {
-      if (transactionId) await remove(transactionId);
-    } catch {
-      await repo.put('pending', decided).catch(() => {}); // keep the row and its entry in step
-      throw refuse(SAVE_FAILED.form);
-    }
-    set({ pending: state.pending.map((p) => (p.id === row.id ? row : p)) });
-    try { await setImportStatus(row.importId, 'reviewing'); } catch { /* status follows the rows; fixed on the next action */ }
-  }
-
-  // Merchant rules for a deleted category would make a backup unrestorable, so they go with it.
-  async function clearRules(categoryId) {
-    const old = state.merchantRules.filter((r) => r.categoryId === categoryId);
-    for (const r of old) await repo.delete('merchantRules', r.pattern);
-    if (old.length) set({ merchantRules: state.merchantRules.filter((r) => !old.includes(r)) });
-  }
-
-  // Undo that can't safely happen (or fails) throws with a message for the person; the toast shows it
-  // and keeps its button so they can try again. It never claims "Undone" when nothing changed.
+  // Undo that can't safely happen (or fails) throws with a message for the person; the toast shows it.
   const refuse = (message) => Object.assign(new Error(message), { userMessage: message });
-  const orThrow = (result) => { if (!result.ok) throw refuse(result.errors.form ?? 'That didn\u2019t work. Please try again.'); };
 
-  async function saveCategory(record, before) {
+  // Writes `next` (or deletes `previous` when next is null) and keeps state in step.
+  async function write(list, next, previous) {
+    const key = KEY[list];
+    if (next) await repo.put(list, next);
+    // A check-in moved to another day: the old day goes away.
+    if (previous && (!next || previous[key] !== next[key])) await repo.delete(list, previous[key]);
+    const drop = new Set([previous?.[key], next?.[key]]);
+    set({ [list]: [...state[list].filter((r) => !drop.has(r[key])), ...(next ? [next] : [])].sort(SORTS[list]) });
+  }
+
+  // Saves a change and returns an undo that puts back exactly what was there.
+  async function save(list, next, previous) {
     try {
-      await repo.put('categories', record);
+      await write(list, next, previous);
     } catch {
       return { ok: false, errors: SAVE_FAILED };
     }
-    const categories = [...state.categories.filter((c) => c.id !== record.id), record].sort((a, b) => a.order - b.order);
-    set({ categories });
     const undo = async () => {
-      // Entries added since then must keep a valid category of the right type.
-      if (inUse(record.id) && (!before || before.type !== record.type)) {
-        throw refuse(`Entries or bills now use ${record.name}, so this can\u2019t be undone. You can hide or edit it instead.`);
-      }
-      if (before) return orThrow(await saveCategory(before, null));
       try {
-        await repo.delete('categories', record.id);
+        await write(list, previous, next);
       } catch {
         throw refuse(SAVE_FAILED.form);
       }
-      set({ categories: state.categories.filter((c) => c.id !== record.id) });
     };
-    return { ok: true, record, undo };
+    return { ok: true, record: next, undo };
   }
 
-  async function saveBill(record, before) {
-    try {
-      await repo.put('bills', record);
-    } catch {
-      return { ok: false, errors: SAVE_FAILED };
-    }
-    set({ bills: [...state.bills.filter((b) => b.id !== record.id), record].sort(byDueDay) });
-    const undo = async () => {
-      if (before) return orThrow(await saveBill(before, null));
-      try {
-        await repo.delete('bills', record.id);
-      } catch {
-        throw refuse(SAVE_FAILED.form);
-      }
-      set({ bills: state.bills.filter((b) => b.id !== record.id) });
-    };
-    return { ok: true, record, undo };
+  // One-time move of debts, bills and take-home pay from the earlier version of the app.
+  // Written in ONE transaction together with the "done" flag, so it can't half-happen.
+  async function carryOver() {
+    const [carried, ...lists] = await Promise.all([repo.get('meta', 'carriedOver'), ...LISTS.map((l) => repo.getAll(l))]);
+    if (carried) return;
+    if (lists.some((l) => l.length)) return repo.put('meta', { key: 'carriedOver', value: 1 });
+    const [debts, bills, meta] = await Promise.all([repo.getAll('debts'), repo.getAll('bills'), repo.getAll('meta')]);
+    const pay = meta.find((m) => m.key === 'monthlyTakeHomeCents');
+    const data = fromLegacy({ debts, bills, monthlyTakeHomeCents: pay?.value ?? null }, { today: today(), now: now(), newId });
+    await repo.replaceAll({ ...data, meta: [...meta.filter((m) => m.key !== 'carriedOver'), { key: 'carriedOver', value: 1 }] });
   }
 
-  // Generic save-with-undo for simple stores (debts, goals).
-  async function saveRecord(storeName, record, before) {
-    try { await repo.put(storeName, record); } catch { return { ok: false, errors: SAVE_FAILED }; }
-    set({ [storeName]: [...state[storeName].filter((r) => r.id !== record.id), record].sort(SORTS[storeName]) });
-    const undo = async () => {
-      if (before) return orThrow(await saveRecord(storeName, before, null));
-      try { await repo.delete(storeName, record.id); } catch { throw refuse(SAVE_FAILED.form); }
-      set({ [storeName]: state[storeName].filter((r) => r.id !== record.id) });
-    };
-    return { ok: true, record, undo };
-  }
-
-  async function saveChallenge(record, before) {
-    try {
-      await repo.put('challenges', record);
-    } catch {
-      return { ok: false, errors: SAVE_FAILED };
-    }
-    set({ challenges: [record, ...state.challenges.filter((c) => c.id !== record.id)].sort((a, b) => b.createdAt - a.createdAt) });
-    const undo = async () => {
-      if (before) return orThrow(await saveChallenge(before, null));
-      try { await repo.delete('challenges', record.id); } catch { throw refuse(SAVE_FAILED.form); }
-      set({ challenges: state.challenges.filter((c) => c.id !== record.id) });
-    };
-    return { ok: true, record, undo };
-  }
-
-  async function remove(id) {
-    await repo.delete('transactions', id);
-    set({ transactions: withoutTransaction(id) });
-  }
+  const add = (list, input) => {
+    if (state[list].length >= LIMITS[list]) return { ok: false, errors: { form: `You can have up to ${LIMITS[list]}.` } };
+    const result = VALIDATORS[list](input);
+    if (!result.ok) return result;
+    const time = now();
+    return save(list, { id: newId(), ...result.value, createdAt: time, updatedAt: time }, null);
+  };
+  const update = (list, id, input) => {
+    const before = state[list].find((r) => r.id === id);
+    if (!before) return { ok: false, errors: { form: GONE[list] } };
+    const result = VALIDATORS[list](input);
+    if (!result.ok) return result;
+    return save(list, { ...before, ...result.value, updatedAt: now() }, before);
+  };
+  const remove = (list, key) => {
+    const before = state[list].find((r) => r[KEY[list]] === key);
+    if (!before) return { ok: false, errors: { form: GONE[list] } };
+    return save(list, null, before);
+  };
 
   return {
     getState: () => state,
@@ -195,107 +114,61 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
     },
 
     async init() {
-      await seedCategoriesOnce(repo);
-      const rows = await Promise.all(STATE_STORES.map((name) => repo.getAll(name)));
-      set({ ready: true, ...shape(Object.fromEntries(STATE_STORES.map((name, i) => [name, rows[i]]))) });
+      await carryOver();
+      const rows = await Promise.all(APP_STORES.map((name) => repo.getAll(name)));
+      set({ ready: true, ...shape(Object.fromEntries(APP_STORES.map((name, i) => [name, rows[i]]))) });
     },
 
-    async addTransaction(input) {
-      const result = validateTransaction(input, { categories: state.categories, today: today() });
+    addCard: (input) => add('cards', input),
+    updateCard: (id, input) => update('cards', id, input),
+    // Past check-ins keep its old balances (history); the plan only uses cards that still exist.
+    deleteCard: (id) => remove('cards', id),
+
+    addIncome: (input) => add('incomes', input),
+    updateIncome: (id, input) => update('incomes', id, input),
+    deleteIncome: (id) => remove('incomes', id),
+
+    addExpense: (input) => add('expenses', input),
+    updateExpense: (id, input) => update('expenses', id, input),
+    deleteExpense: (id) => remove('expenses', id),
+
+    // Saves the balances for a day. A day that already has a check-in is updated in place
+    // (one write, same key), and Undo puts the old balances back.
+    async saveCheckin(input) {
+      const result = validateCheckin(input, { cards: state.cards, today: today() });
       if (!result.ok) return result;
-      const time = now();
-      const record = { id: newId(), ...result.value, source: 'manual', importId: null, fingerprint: null, createdAt: time, updatedAt: time };
-      try {
-        await restore(record);
-      } catch {
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      return { ok: true, record, undo: () => remove(record.id) };
+      const before = state.checkins.find((c) => c.date === result.value.date) ?? null;
+      if (!before && state.checkins.length >= LIMITS.checkins) return { ok: false, errors: { form: `You can have up to ${LIMITS.checkins} check-ins.` } };
+      return save('checkins', { ...result.value, createdAt: before?.createdAt ?? now() }, before);
     },
-
-    async updateTransaction(id, input) {
-      const before = state.transactions.find((t) => t.id === id);
-      if (!before) return { ok: false, errors: { form: 'This entry no longer exists.' } };
-      const result = validateTransaction(input, { categories: state.categories, today: today(), keepCategoryId: before.categoryId });
-      if (!result.ok) return result;
-      const record = { ...before, ...result.value, updatedAt: now() };
-      try {
-        await restore(record);
-      } catch {
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      return { ok: true, record, undo: () => restore(before) };
-    },
-
-    // Everything on this device, in the shape stored (for backups and undoing a restore).
-    snapshot() {
-      return {
-        transactions: state.transactions.map((t) => ({ ...t })),
-        categories: state.categories.map((c) => ({ ...c })),
-        meta: Object.entries(state.meta).map(([key, value]) => ({ key, value })),
-        bills: state.bills.map((b) => ({ ...b })),
-        challenges: state.challenges.map((c) => ({ ...c })),
-        debts: state.debts.map((d) => ({ ...d })),
-        goals: state.goals.map((g) => ({ ...g })),
-        imports: state.imports.map((i) => ({ ...i })),
-        pending: state.pending.map((p) => ({ ...p })),
-        merchantRules: state.merchantRules.map((r) => ({ ...r })),
-        feedback: state.feedback.map((f) => ({ ...f, categoryIds: [...f.categoryIds] })),
-      };
-    },
+    deleteCheckin: (date) => remove('checkins', date),
 
     async setMeta(key, value) {
       await repo.put('meta', { key, value });
       set({ meta: { ...state.meta, [key]: value } });
     },
 
-    // Next Best Step: skip a step (or bring it back). Returns undo.
-    async setStepSkipped(stepId, skipped) {
-      if (!STEP_IDS.includes(stepId)) return { ok: false, errors: { form: 'That step doesn’t exist.' } };
-      const write = (skip) => {
-        const list = Array.isArray(state.meta.skippedSteps) ? state.meta.skippedSteps : [];
-        return this.setMeta('skippedSteps', skip ? [...new Set([...list, stepId])] : list.filter((id) => id !== stepId));
+    // Everything on this device, in the shape stored (for backups and undoing a restore).
+    snapshot() {
+      return {
+        cards: state.cards.map((c) => ({ ...c })),
+        checkins: state.checkins.map((c) => ({ ...c, balances: c.balances.map((b) => ({ ...b })) })),
+        incomes: state.incomes.map((i) => ({ ...i })),
+        expenses: state.expenses.map((e) => ({ ...e })),
+        meta: Object.entries(state.meta).map(([key, value]) => ({ key, value })),
       };
-      try { await write(skipped); } catch { return { ok: false, errors: SAVE_FAILED }; }
-      // Undo reverses only this step, so later skips stay as they are.
-      return { ok: true, undo: async () => { try { await write(!skipped); } catch { throw refuse(SAVE_FAILED.form); } } };
-    },
-
-    // Take-home pay and savings %, saved together. Returns undo.
-    async setProfile(input) {
-      const result = validateProfile(input);
-      if (!result.ok) return result;
-      const before = Object.fromEntries(Object.keys(result.value).map((k) => [k, state.meta[k]]));
-      // undefined = "wasn't set before", so undo removes it rather than leaving the new value.
-      const write = async (values) => {
-        const entries = Object.entries(values);
-        const rows = entries.filter(([, v]) => v !== undefined).map(([key, value]) => ({ key, value }));
-        const removed = entries.filter(([, v]) => v === undefined).map(([key]) => key);
-        if (rows.length) await repo.putMany('meta', rows);
-        for (const key of removed) await repo.delete('meta', key);
-        const meta = { ...state.meta, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) };
-        for (const key of removed) delete meta[key];
-        set({ meta });
-      };
-      try {
-        await write(result.value);
-      } catch {
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      return { ok: true, value: result.value, undo: () => write(before) };
     },
 
     // Replaces everything (restore). Data must already be validated (services/backup.js).
     async replaceAll(data) {
       const before = this.snapshot();
-      // Older backups lack newer stores. A restore also clears any import still being reviewed.
-      data = { bills: [], challenges: [], debts: [], goals: [], imports: [], pending: [], merchantRules: [], feedback: [], ...data };
+      const full = { cards: [], checkins: [], incomes: [], expenses: [], meta: [], ...data };
       try {
-        await repo.replaceAll(data);
+        await repo.replaceAll(full);
       } catch {
         return { ok: false, errors: SAVE_FAILED };
       }
-      set(shape(data));
+      set(shape(full));
       return {
         ok: true,
         undo: async () => {
@@ -305,285 +178,15 @@ export function createStore({ repo, now = Date.now, newId = defaultNewId, today 
       };
     },
 
-    // ── Categories ── (each returns undo)
-
-    async addCategory(input) {
-      const result = validateCategory(input, { categories: state.categories });
-      if (!result.ok) return result;
-      const order = Math.max(0, ...state.categories.map((c) => c.order)) + 1;
-      const record = { id: newId(), ...result.value, benchmarkKey: null, archived: false, order };
-      return saveCategory(record, null);
-    },
-
-    async updateCategory(id, input) {
-      const before = state.categories.find((c) => c.id === id);
-      if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
-      // Money in/out can't change once entries use it: their history would stop making sense.
-      const type = inUse(id) ? before.type : input?.type ?? before.type;
-      const result = validateCategory({ ...input, type }, { categories: state.categories, editingId: id });
-      if (!result.ok) return result;
-      if (result.value.type !== before.type) {
-        try { await clearOldChallenges(id); } catch { return { ok: false, errors: SAVE_FAILED }; }
-      }
-      return saveCategory({ ...before, ...result.value }, before);
-    },
-
-    async setCategoryHidden(id, hidden) {
-      const before = state.categories.find((c) => c.id === id);
-      if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
-      return saveCategory({ ...before, archived: Boolean(hidden) }, before);
-    },
-
-    // Only for categories no entry uses; used ones can be hidden instead, so history stays intact.
-    async deleteCategory(id) {
-      const before = state.categories.find((c) => c.id === id);
-      if (!before) return { ok: false, errors: { form: 'This category no longer exists.' } };
-      if (inUse(id)) return { ok: false, errors: { form: 'Entries, bills, or an active challenge use this category, so it can\u2019t be deleted. You can hide it instead.' } };
+    // "Delete everything": every store, including what's left from the earlier version.
+    async wipe() {
       try {
-        await clearOldChallenges(id);
-        await clearRules(id);
-        await repo.delete('categories', id);
+        await repo.replaceAll(Object.fromEntries([...APP_STORES, ...LEGACY_STORES].map((name) => [name, []])));
       } catch {
         return { ok: false, errors: SAVE_FAILED };
       }
-      set({ categories: state.categories.filter((c) => c.id !== id) });
-      return { ok: true, undo: async () => orThrow(await saveCategory(before, null)) };
-    },
-
-    usedBy: (id) => usedBy(id),
-    billsUsing: (id) => billsUsing(id),
-
-    // ── Recurring bills ── (each returns undo)
-
-    async addBill(input) {
-      const result = validateBill(input, { categories: state.categories });
-      if (!result.ok) return result;
-      const time = now();
-      return saveBill({ id: newId(), ...result.value, createdAt: time, updatedAt: time }, null);
-    },
-
-    async updateBill(id, input) {
-      const before = state.bills.find((b) => b.id === id);
-      if (!before) return { ok: false, errors: { form: 'This bill no longer exists.' } };
-      const result = validateBill(input, { categories: state.categories, keepCategoryId: before.categoryId });
-      if (!result.ok) return result;
-      return saveBill({ ...before, ...result.value, updatedAt: now() }, before);
-    },
-
-    // ── Statement import ── (E7: review queue, nothing filed without your OK)
-
-    // items come from prepareImport. One import is reviewed at a time.
-    async startImport({ fileName, items }) {
-      if (!items.length) return { ok: false, errors: { form: 'There’s nothing new to review in this file.' } };
-      if (state.imports.some((i) => i.status === 'reviewing')) return { ok: false, errors: { form: 'Finish or cancel the statement you’re reviewing first.' } };
-      const time = now();
-      const record = { id: newId(), fileName: [...cleanNote(maskNumbers(fileName))].slice(0, 100).join('') || 'Statement', uploadedAt: time, rowCount: items.length, status: 'reviewing' };
-      const pending = items.map((item, order) => ({ ...item, order, id: newId(), importId: record.id, decision: 'pending', transactionId: null }));
-      try {
-        await repo.putMany('pending', pending);
-        await repo.put('imports', record);
-      } catch {
-        await Promise.allSettled(pending.map((p) => repo.delete('pending', p.id)));
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      set({ imports: [...state.imports, record], pending: [...state.pending, ...pending].sort(byOrder) });
-      return { ok: true, record };
-    },
-
-    // Add a pending row as an entry in the category you chose. Returns undo.
-    async addPending(id, categoryId) {
-      const row = state.pending.find((p) => p.id === id && p.decision === 'pending');
-      if (!row) return { ok: false, errors: { form: 'This row was already handled.' } };
-      const result = validateTransaction({ type: row.type, amountCents: row.amountCents, categoryId, date: row.date, note: row.merchant ?? row.description }, { categories: state.categories, today: today() });
-      if (!result.ok) return { ok: false, errors: { form: result.errors.categoryId ?? result.errors.date ?? 'This row can’t be added.' } };
-      const time = now();
-      const entry = { id: newId(), ...result.value, source: 'import', importId: row.importId, fingerprint: row.fingerprint, createdAt: time, updatedAt: time };
-      const decided = { ...row, decision: 'added', transactionId: entry.id };
-      try {
-        await restore(entry);
-        try { await repo.put('pending', decided); } catch (error) { await remove(entry.id); throw error; }
-      } catch {
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      set({ pending: state.pending.map((p) => (p.id === id ? decided : p)) });
-      await finishIfDone(row.importId);
-      return { ok: true, record: entry, undo: () => reopen(row, entry.id) };
-    },
-
-    async skipPending(id) {
-      const row = state.pending.find((p) => p.id === id && p.decision === 'pending');
-      if (!row) return { ok: false, errors: { form: 'This row was already handled.' } };
-      const decided = { ...row, decision: 'skipped' };
-      try { await repo.put('pending', decided); } catch { return { ok: false, errors: SAVE_FAILED }; }
-      set({ pending: state.pending.map((p) => (p.id === id ? decided : p)) });
-      await finishIfDone(row.importId);
-      return { ok: true, undo: () => reopen(row, null) };
-    },
-
-    // Stop reviewing: rows not yet added are dropped; entries already added stay. Returns undo.
-    async cancelImport(importId) {
-      const record = state.imports.find((i) => i.id === importId);
-      if (!record) return { ok: false, errors: { form: 'This import no longer exists.' } };
-      const rows = state.pending.filter((p) => p.importId === importId);
-      try {
-        for (const p of rows) await repo.delete('pending', p.id);
-        await repo.delete('imports', importId);
-      } catch {
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      set({ imports: state.imports.filter((i) => i.id !== importId), pending: state.pending.filter((p) => p.importId !== importId) });
-      return {
-        ok: true,
-        undo: async () => {
-          // Only one import is reviewed at a time.
-          if (record.status === 'reviewing' && state.imports.some((i) => i.status === 'reviewing')) throw refuse('You started another import, so this one can\u2019t come back. Import the file again instead.');
-          try { await repo.putMany('pending', rows); await repo.put('imports', record); } catch { throw refuse(SAVE_FAILED.form); }
-          set({ imports: [...state.imports, record], pending: [...state.pending, ...rows].sort(byOrder) });
-        },
-      };
-    },
-
-    // "Always suggest Dining Out for Chipotle": a suggestion only, never auto-filed. Returns undo.
-    async learnRule(merchant, categoryId) {
-      const pattern = merchantKey(merchant);
-      const category = state.categories.find((c) => c.id === categoryId && !c.archived);
-      if (!pattern || !category) return { ok: false, errors: { form: 'That can’t be remembered.' } };
-      const before = state.merchantRules.find((r) => r.pattern === pattern) ?? null;
-      const rule = { pattern, categoryId, timesConfirmed: before?.categoryId === categoryId ? before.timesConfirmed + 1 : 1, updatedAt: now() };
-      const write = async (next) => {
-        if (next) await repo.put('merchantRules', next); else await repo.delete('merchantRules', pattern);
-        set({ merchantRules: [...state.merchantRules.filter((r) => r.pattern !== pattern), ...(next ? [next] : [])] });
-      };
-      try { await write(rule); } catch { return { ok: false, errors: SAVE_FAILED }; }
-      return { ok: true, record: rule, undo: async () => { try { await write(before); } catch { throw refuse(SAVE_FAILED.form); } } };
-    },
-
-    // ── Coach feedback ── 👍 / 👎 / "I'm on it" / "Not now": one reaction per tip topic per month. Returns undo.
-    async setTipReaction(tip, reaction) {
-      if (!REACTIONS.includes(reaction) || !tip || typeof tip.type !== 'string') return { ok: false, errors: { form: 'That didn’t work. Please try again.' } };
-      const month = monthKey(today());
-      const topic = topicOf(tip);
-      const before = state.feedback.find((f) => f.topic === topic && f.month === month) ?? null;
-      const categoryIds = tipCategories(tip, state.categories);
-      const record = {
-        id: before?.id ?? newId(), topic, insightType: tip.type, month, reaction, categoryIds,
-        // "I'm on it" remembers your usual, so next month can tell you if it worked.
-        baselineCents: reaction === 'on-it' ? usualSpending(state.transactions, categoryIds, today()) : 0,
-        createdAt: now(),
-      };
-      // Keep well under what a backup accepts (5,000): the oldest reactions are pruned first (not part of undo).
-      if (!before && state.feedback.length >= MAX_FEEDBACK) {
-        try {
-          for (const f of state.feedback.slice(0, state.feedback.length - MAX_FEEDBACK + 1)) {
-            await repo.delete('feedback', f.id);
-            set({ feedback: state.feedback.filter((x) => x.id !== f.id) });
-          }
-        } catch {
-          return { ok: false, errors: SAVE_FAILED };
-        }
-      }
-      const write = async (next) => {
-        if (next) await repo.put('feedback', next); else await repo.delete('feedback', record.id);
-        set({ feedback: [...state.feedback.filter((f) => f.id !== record.id), ...(next ? [next] : [])].sort(byCreated) });
-      };
-      try { await write(record); } catch { return { ok: false, errors: SAVE_FAILED }; }
-      return { ok: true, record, undo: async () => { try { await write(before); } catch { throw refuse(SAVE_FAILED.form); } } };
-    },
-
-    // ── Savings goals ── (each returns undo)
-
-    async addGoal(input) {
-      if (state.goals.length >= MAX_GOALS) return { ok: false, errors: { form: `You can have up to ${MAX_GOALS} goals.` } };
-      const result = validateGoal(input);
-      if (!result.ok) return result;
-      const time = now();
-      return saveRecord('goals', { id: newId(), ...result.value, createdAt: time, updatedAt: time }, null);
-    },
-
-    async updateGoal(id, input) {
-      const before = state.goals.find((g) => g.id === id);
-      if (!before) return { ok: false, errors: { form: 'This goal no longer exists.' } };
-      const result = validateGoal(input);
-      if (!result.ok) return result;
-      return saveRecord('goals', { ...before, ...result.value, updatedAt: now() }, before);
-    },
-
-    async deleteGoal(id) {
-      const before = state.goals.find((g) => g.id === id);
-      if (!before) return { ok: false, errors: { form: 'This goal no longer exists.' } };
-      try { await repo.delete('goals', id); } catch { return { ok: false, errors: SAVE_FAILED }; }
-      set({ goals: state.goals.filter((g) => g.id !== id) });
-      return { ok: true, undo: async () => orThrow(await saveRecord('goals', before, null)) };
-    },
-
-    // ── Debts ── (each returns undo)
-
-    async addDebt(input) {
-      if (state.debts.length >= MAX_DEBTS) return { ok: false, errors: { form: `You can have up to ${MAX_DEBTS} debts.` } };
-      const result = validateDebt(input);
-      if (!result.ok) return result;
-      const time = now();
-      return saveRecord('debts', { id: newId(), ...result.value, createdAt: time, updatedAt: time }, null);
-    },
-
-    async updateDebt(id, input) {
-      const before = state.debts.find((d) => d.id === id);
-      if (!before) return { ok: false, errors: { form: 'This debt no longer exists.' } };
-      const result = validateDebt(input);
-      if (!result.ok) return result;
-      return saveRecord('debts', { ...before, ...result.value, updatedAt: now() }, before);
-    },
-
-    async deleteDebt(id) {
-      const before = state.debts.find((d) => d.id === id);
-      if (!before) return { ok: false, errors: { form: 'This debt no longer exists.' } };
-      try { await repo.delete('debts', id); } catch { return { ok: false, errors: SAVE_FAILED }; }
-      set({ debts: state.debts.filter((d) => d.id !== id) });
-      return { ok: true, undo: async () => orThrow(await saveRecord('debts', before, null)) };
-    },
-
-    // ── Cut Plan challenges ── (each returns undo)
-
-    async addChallenge(input) {
-      const result = validateChallenge(input, { categories: state.categories });
-      if (!result.ok) return result;
-      if (state.challenges.some((c) => c.month === result.value.month && c.categoryId === result.value.categoryId)) {
-        return { ok: false, errors: { form: 'There\u2019s already a challenge for this category this month.' } };
-      }
-      // "Not this month" saves straight to skipped (one write, so it can't half-happen).
-      const status = input?.status === 'skipped' ? 'skipped' : 'active';
-      const record = { id: newId(), ...result.value, status, createdAt: now() };
-      return saveChallenge(record, null);
-    },
-
-    // status: 'active' | 'skipped' | 'stopped'
-    async setChallengeStatus(id, status) {
-      const before = state.challenges.find((c) => c.id === id);
-      if (!before || !['active', 'skipped', 'stopped'].includes(status)) return { ok: false, errors: { form: 'This challenge no longer exists.' } };
-      return saveChallenge({ ...before, status }, before);
-    },
-
-    async deleteBill(id) {
-      const before = state.bills.find((b) => b.id === id);
-      if (!before) return { ok: false, errors: { form: 'This bill no longer exists.' } };
-      try {
-        await repo.delete('bills', id);
-      } catch {
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      set({ bills: state.bills.filter((b) => b.id !== id) });
-      return { ok: true, undo: async () => orThrow(await saveBill(before, null)) };
-    },
-
-    async deleteTransaction(id) {
-      const before = state.transactions.find((t) => t.id === id);
-      if (!before) return { ok: false, errors: { form: 'This entry no longer exists.' } };
-      try {
-        await remove(id);
-      } catch {
-        return { ok: false, errors: SAVE_FAILED };
-      }
-      return { ok: true, undo: () => restore(before) };
+      set(shape({}));
+      return { ok: true };
     },
   };
 }
