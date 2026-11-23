@@ -5,6 +5,7 @@ import { getStore } from '../appStore.js';
 import { choiceGroup } from '../ui/choiceGroup.js';
 import { monthlyIncomeCents } from '../services/planner.js';
 import { storageError, backLink, formatApr, field, moneyInput, textInput, showErrors, oneAtATime, finish } from '../ui/form.js';
+import { personTag } from '../ui/personTag.js';
 
 export const FREQUENCY_LABELS = { weekly: 'Every week', biweekly: 'Every 2 weeks', semimonthly: 'Twice a month', monthly: 'Every month' };
 const ordinal = (n) => `${n}${[, 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] ?? 'th'}`;
@@ -59,7 +60,7 @@ export function setupView() {
     render();
     const stop = store.subscribe(() => { if (!body.isConnected) return stop(); render(); });
   }, () => { clear(body); body.append(storageError()); });
-  return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Setup'), body);
+  return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Setup'), personTag(), body);
 }
 
 // One add/edit screen, configured per kind (card, income, expense).

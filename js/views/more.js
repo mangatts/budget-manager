@@ -3,7 +3,7 @@ import { formatCents } from '../utils/money.js';
 import { choiceGroup } from '../ui/choiceGroup.js';
 import { readAppliedPrefs, savePref, applyPrefs } from '../services/preferences.js';
 import { installState, promptInstall, requestPersistence, storageStatus } from '../services/pwa.js';
-import { getStore } from '../appStore.js';
+import { getStore, getPeople } from '../appStore.js';
 import { lastBackupText } from './backup.js';
 import { backupReminder } from '../ui/backupReminder.js';
 
@@ -66,6 +66,23 @@ function backupsSection() {
   );
 }
 
+function peopleSection() {
+  const detail = el('span', { class: 'list-row-sub', id: 'people-status' }, 'Each person has their own cards and bills');
+  getPeople().then((people) => {
+    const count = people.list().length;
+    detail.textContent = `Using now: ${people.active().name} · ${count} ${count === 1 ? 'person' : 'people'}`;
+  }, () => {});
+  return el('section', { class: 'section', 'aria-labelledby': 'people-title' },
+    el('h2', { class: 'section-title', id: 'people-title' }, 'People'),
+    el('ul', { class: 'list' }, el('li', {},
+      el('a', { class: 'list-row list-row-link', href: '#/people', id: 'people-link' },
+        el('span', { class: 'list-row-main' }, el('span', {}, 'Add, switch or remove people'), detail),
+        el('span', { 'aria-hidden': 'true' }, '\u203a'),
+      ),
+    )),
+  );
+}
+
 function formatBytes(bytes) {
   if (bytes == null) return null;
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -99,6 +116,8 @@ export function moreView() {
 
   return el('div', { class: 'screen' },
     el('h1', { tabindex: '-1' }, 'More'),
+
+    peopleSection(),
 
     el('section', { class: 'section', 'aria-labelledby': 'display-title' },
       el('h2', { class: 'section-title', id: 'display-title' }, 'Display'),

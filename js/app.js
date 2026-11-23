@@ -5,6 +5,7 @@ import { setupView, cardView, incomeView, expenseView } from './views/setup.js';
 import { moreView } from './views/more.js';
 import { backupView } from './views/backup.js';
 import { wipeView } from './views/wipe.js';
+import { peopleView, personView } from './views/people.js';
 import { designView } from './views/design.js';
 import { getStore } from './appStore.js';
 import { initToasts, setStickyToast } from './ui/toast.js';
@@ -21,6 +22,8 @@ const routes = {
   income: { title: 'Income', view: incomeView, tab: 'setup' },
   expense: { title: 'Expense', view: expenseView, tab: 'setup' },
   more: { title: 'More', view: moreView },
+  people: { title: 'People', view: peopleView, tab: 'more' },
+  person: { title: 'Edit person', view: personView, tab: 'more' }, // #/person/<id>
   backup: { title: 'Backups', view: backupView, tab: 'more' },
   wipe: { title: 'Delete everything', view: wipeView, tab: 'more' },
   design: { title: 'Design reference', view: designView }, // not in the tab bar

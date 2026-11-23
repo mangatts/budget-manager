@@ -7,6 +7,7 @@ import { buildPlan } from '../services/planner.js';
 import { backupReminder } from '../ui/backupReminder.js';
 import { storageError, formatApr } from '../ui/form.js';
 import { dueText } from './setup.js';
+import { personTag } from '../ui/personTag.js';
 
 const HIGH_USE = 30; // % of a limit; above this, credit scores start to suffer
 
@@ -145,5 +146,5 @@ export function homeView() {
     render(body, store.getState());
     const stop = store.subscribe((state) => { if (!body.isConnected) return stop(); render(body, state); });
   }, () => { clear(body); body.append(storageError()); });
-  return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Home'), body);
+  return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Home'), personTag(), body);
 }

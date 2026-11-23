@@ -7,6 +7,7 @@ import { getStore } from '../appStore.js';
 import { latestBalances } from '../services/planner.js';
 import { addedOn } from '../services/validate.js';
 import { storageError, field, moneyInput, centsToInput, showErrors, oneAtATime, finish, formatApr } from '../ui/form.js';
+import { personTag } from '../ui/personTag.js';
 
 function checkinForm(store, startDate) {
   const { cards, checkins } = store.getState();
@@ -91,5 +92,5 @@ export function checkinView(param) {
     const start = isIsoDate(param) && param <= today ? param : today;
     body.append(checkinForm(store, start));
   }, () => { clear(body); body.append(storageError()); });
-  return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Check-in'), body);
+  return el('div', { class: 'screen' }, el('h1', { tabindex: '-1' }, 'Check-in'), personTag(), body);
 }

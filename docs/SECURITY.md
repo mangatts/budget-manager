@@ -27,6 +27,7 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 | Supply chain | A compromised CDN or npm package | **Zero runtime third-party code**. Dev tools pinned + audited |
 | Leaked backup file | A backup emailed or left in Downloads | **Encrypted by default** (AES-256-GCM) |
 | Lost or shared device | Someone opens the app on your phone | Device lock (OS). Optional app lock later |
+| People on one device | Charles opens Albin's numbers on a shared tablet | Not a security boundary, and the People screen says so: each person should use their own phone for private money. Names are validated like any other input; the app only opens its own database names. |
 | Over-collection | Storing card numbers or bank logins | Never asked for: only a nickname, rate, minimum, limit, and balance |
 | Stale or poisoned cache | An old service worker serving bad code | Versioned SW, same-origin only, update flow |
 | Secrets in repo | An API key committed by accident | No secrets in the client + GitHub secret scanning |
@@ -98,7 +99,7 @@ This plan follows US national (NIST/CISA) guidance, using OWASP's checklists for
 ### 2.6 Privacy
 - No analytics, trackers, ads, or external fonts/CDNs.
 - No network calls at all except loading the app itself.
-- "Delete all data" in Settings wipes IndexedDB, caches, and localStorage.
+- "Delete everything" (More) deletes every person's database, the people list, and the app's localStorage.
 
 ### 2.7 Service worker (built in E2-S5)
 - Caches only same-origin app files, from a generated list (`npm run precache`). CI fails if the list is stale.

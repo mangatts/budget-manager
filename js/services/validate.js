@@ -61,6 +61,14 @@ export function parseApr(input) {
 const objectOrEmpty = (input) => (input && typeof input === 'object' ? input : {});
 const result = (errors, value) => (Object.keys(errors).length ? { ok: false, errors } : { ok: true, value });
 
+// ── People sharing this device ── input: name; `taken` = other people's names.
+export function validatePersonName(input, { taken = [] } = {}) {
+  const errors = {};
+  const name = cleanName(input, 'Charles', errors);
+  if (!errors.name && taken.some((t) => t.toLowerCase() === name.toLowerCase())) errors.name = 'Someone here already has that name. Add a last initial, like Charles B.';
+  return result(errors, { name });
+}
+
 // ── Credit cards ── input: { name, limit, apr, minPayment }
 export function validateCard(input) {
   const raw = objectOrEmpty(input);

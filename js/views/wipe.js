@@ -1,15 +1,18 @@
-// More → Delete everything on this device. Offers a backup first; needs "DELETE" typed to confirm.
+// More → Delete everything on this device (every person). Offers a backup first; needs "DELETE" typed to confirm.
 import { el, clear } from '../utils/dom.js';
-import { getStore } from '../appStore.js';
+import { getStore, getPeople } from '../appStore.js';
 import { PREFS_KEY } from '../services/preferences.js';
+import { confirmDeleteForm } from '../ui/form.js';
 
-const CONFIRM_WORD = 'DELETE';
-
-// Clears every store (including data left from the earlier version), settings, and reminders.
-// App files stay cached, so it still works offline.
-export async function wipeDevice(store) {
-  const result = await store.wipe();
-  if (!result.ok) return result;
+// Deletes every person's database (which also removes data left from the earlier version) and the
+// people list, then settings and reminders. App files stay cached, so it still works offline.
+// Deleting whole databases (not emptying them) means a retry after a partial failure still works.
+export async function wipeDevice(people) {
+  try {
+    await people.removeEveryone();
+  } catch {
+    return { ok: false, errors: { form: 'Some people’s data couldn’t be deleted. Close other Budget Manager tabs, then try again.' } };
+  }
   try {
     for (const key of Object.keys(localStorage)) if (key.startsWith('bm:') || key === PREFS_KEY) localStorage.removeItem(key);
   } catch { /* storage blocked: nothing saved there anyway */ }
@@ -18,40 +21,31 @@ export async function wipeDevice(store) {
 
 export function wipeView() {
   const body = el('div', { class: 'section' }, el('p', { class: 'lead' }, 'Loading…'));
-  getStore().then((store) => {
+  Promise.all([getStore(), getPeople()]).then(([store, people]) => {
     const { cards, checkins } = store.getState();
-    const input = el('input', { class: 'input', id: 'wipe-confirm', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-describedby': 'wipe-hint' });
-    const button = el('button', { class: 'btn btn-danger btn-block', type: 'submit', id: 'wipe-button', disabled: true }, 'Delete everything');
-    const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
-    const form = el('form', { class: 'section', novalidate: true, id: 'wipe-form' },
-      el('p', {}, `This permanently removes your ${cards.length} ${cards.length === 1 ? 'card' : 'cards'}, ${checkins.length} ${checkins.length === 1 ? 'check-in' : 'check-ins'}, income, expenses, and settings from this device. It can’t be undone.`),
-      el('div', { class: 'card warning-card' },
-        el('span', { class: 'pill pill-warning' }, '⚠ Back up first?'),
-        el('p', {}, 'A backup lets you bring everything back later, here or on another phone.'),
-        el('a', { class: 'btn btn-secondary', href: '#/backup' }, 'Make a backup'),
-      ),
-      el('div', { class: 'field' },
-        el('label', { class: 'field-label', for: 'wipe-confirm' }, `Type ${CONFIRM_WORD} to confirm`),
-        input,
-        el('span', { class: 'field-hint', id: 'wipe-hint' }, 'In capital letters'),
-      ),
-      error,
-      button,
-    );
-    input.addEventListener('input', () => { button.disabled = input.value.trim() !== CONFIRM_WORD; });
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (input.value.trim() !== CONFIRM_WORD) return;
-      button.disabled = true;
-      const result = await wipeDevice(store);
-      if (!result.ok) {
-        error.textContent = result.errors.form;
-        error.hidden = false;
-        button.disabled = false;
-        return;
-      }
-      location.hash = '#/home';
-      location.reload();
+    const count = people.list().length;
+    const what = count > 1
+      ? `This permanently removes everyone’s data from this device: all ${count} people, with their cards, check-ins, income, expenses, and settings. It can’t be undone.`
+      : `This permanently removes your ${cards.length} ${cards.length === 1 ? 'card' : 'cards'}, ${checkins.length} ${checkins.length === 1 ? 'check-in' : 'check-ins'}, income, expenses, and settings from this device. It can’t be undone.`;
+    const form = confirmDeleteForm({
+      id: 'wipe',
+      buttonLabel: 'Delete everything',
+      content: [
+        el('p', { id: 'wipe-what' }, what),
+        el('div', { class: 'card warning-card' },
+          el('span', { class: 'pill pill-warning' }, '⚠ Back up first?'),
+          el('p', {}, count > 1 ? 'A backup saves one person. Switch to each person you want to keep and make a backup for them.' : 'A backup lets you bring everything back later, here or on another phone.'),
+          el('a', { class: 'btn btn-secondary', href: '#/backup' }, 'Make a backup'),
+        ),
+      ],
+      async onConfirm() {
+        const result = await wipeDevice(people);
+        if (result.ok) {
+          location.hash = '#/home';
+          location.reload();
+        }
+        return result;
+      },
     });
     clear(body);
     body.append(form);

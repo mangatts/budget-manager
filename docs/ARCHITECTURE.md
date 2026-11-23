@@ -59,6 +59,8 @@ Rules: the UI never touches IndexedDB; all outside data goes through `validate.j
 { key: "lastBackupAt", value: 1761650000000 }
 ```
 
+**People (js/people.js).** Each person on the device has their own database with the schema above: the first person uses `budget-manager` (so data from before people existed stays theirs), others use `budget-manager-<their id>`. The list lives in a separate database, `budget-manager-people` (store `people`: `{ id, name, dbName, createdAt }`). Rows are checked on read (`isPerson`), so the app only ever opens its own database names. Who's using it now is a per-device convenience in localStorage (`bm:person`); switching reloads the app. Removing a person deletes their database; "Delete everything" deletes every person's database and the list. Backups hold one person.
+
 Stores from v1 (`transactions`, `categories`, `bills`, `debts`, …) still exist because migrations only move forward. They are read once on first open (debts → cards plus a check-in for today, active bills → expenses, take-home pay → monthly income) and cleared by "Delete everything". Old backups (schema 1–7) restore through the same conversion.
 
 ## 4. The plan (services/planner.js)
