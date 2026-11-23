@@ -9,6 +9,8 @@ A simple, private app for your credit cards and monthly cash flow. Enter your in
 
 It runs offline, installs like an app, and keeps your data on your device. No accounts, no bank logins, no card numbers.
 
+Sharing a device? Add people in **More → People** (for example Charles and Albin). Each person gets their own cards, income, expenses and check-ins, and you switch between them in one tap.
+
 **Live app:** https://mangatts.github.io/budget-manager/
 
 - [Product](docs/PRODUCT.md)

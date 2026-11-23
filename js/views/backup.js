@@ -2,7 +2,7 @@
 import { el, clear } from '../utils/dom.js';
 import { formatDay, todayLocal } from '../utils/dates.js';
 import { showToast } from '../ui/toast.js';
-import { getStore } from '../appStore.js';
+import { getStore, getPeople } from '../appStore.js';
 import { checkPassphrase, createBackupFile, openBackupFile, backupFileName, MAX_FILE_BYTES, BackupTooLargeError } from '../services/backup.js';
 
 const localDay = (time) => todayLocal(new Date(time));
@@ -204,8 +204,10 @@ function restoreSection(store) {
 
 export function backupView() {
   const body = el('div', { class: 'screen' }, el('p', { class: 'lead' }, 'Loading…'));
-  getStore().then((store) => {
+  Promise.all([getStore(), getPeople()]).then(([store, people]) => {
     clear(body);
+    const name = people.active().name;
+    if (people.list().length > 1) body.append(el('p', { class: 'lead', id: 'backup-person' }, `Backups save and restore ${name}’s data only. Switch person to back up someone else.`));
     body.append(
       el('section', { class: 'section', 'aria-labelledby': 'save-title' }, el('h2', { class: 'section-title', id: 'save-title' }, 'Save a backup'), saveSection(store)),
       el('section', { class: 'section', 'aria-labelledby': 'restore-title' }, el('h2', { class: 'section-title', id: 'restore-title' }, 'Restore from a backup'), restoreSection(store)),

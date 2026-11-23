@@ -108,12 +108,13 @@ function adapter(db) {
   };
 }
 
-export function openIndexedDb({ name = DB_NAME, indexedDB = globalThis.indexedDB } = {}) {
+// `migrations` lets the small people list (js/people.js) use its own schema.
+export function openIndexedDb({ name = DB_NAME, migrations = MIGRATIONS, indexedDB = globalThis.indexedDB } = {}) {
   return new Promise((resolve, reject) => {
     if (!indexedDB) return reject(new Error('This browser can’t save data on this device.'));
-    const req = indexedDB.open(name, MIGRATIONS.length);
+    const req = indexedDB.open(name, migrations.length);
     req.onupgradeneeded = (event) => {
-      for (let version = event.oldVersion; version < MIGRATIONS.length; version++) MIGRATIONS[version](req.result, req.transaction);
+      for (let version = event.oldVersion; version < migrations.length; version++) migrations[version](req.result, req.transaction);
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -124,4 +125,22 @@ export function openIndexedDb({ name = DB_NAME, indexedDB = globalThis.indexedDB
     req.onerror = () => reject(req.error);
     req.onblocked = () => reject(new Error('Close other Budget Manager tabs to finish updating.'));
   });
+}
+
+// Removes a whole database (a person who was removed, or "Delete everything").
+// Open connections close themselves (onversionchange above). If something still blocks it, the browser
+// keeps the request queued and finishes it later, so this waits for the real outcome instead of
+// reporting a failure that later turns into a deletion.
+export function deleteIndexedDb(name, { indexedDB = globalThis.indexedDB } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(name);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// Names of this site's databases, where the browser supports listing them.
+export async function listIndexedDbs({ indexedDB = globalThis.indexedDB } = {}) {
+  if (typeof indexedDB?.databases !== 'function') return [];
+  return (await indexedDB.databases()).map((d) => d.name).filter((n) => typeof n === 'string');
 }

@@ -14,6 +14,8 @@ That's the whole app. It replaced the earlier, bigger Budget Manager (tag `v1-fu
 | Fixed expenses: rent, phone, car, insurance, groceries and gas, with an optional due day | Each card's balance that day |
 | Cards: nickname, APR, minimum payment, optional credit limit | |
 
+**People:** more than one person can use the app on the same device (More → People). Each has their own Setup, check-ins and plan, and the screens show whose money you're looking at. It's for convenience, not privacy: anyone with the device can switch.
+
 ## What Home tells you
 
 1. **Each month:** money coming in − fixed expenses − card minimums = what's left for paying down cards (or how much you're short).

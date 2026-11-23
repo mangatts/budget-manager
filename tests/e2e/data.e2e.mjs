@@ -93,7 +93,8 @@ export async function dataSuite({ page, check, base, launch, newProfile }) {
     indexedDB.open = real;
     return { firstFailed, recovered: store.getState().ready, calls };
   })()`);
-  check('If opening the database fails once, the next try works (not stuck)', retry.firstFailed && retry.recovered && retry.calls === 2, JSON.stringify(retry));
+  // 3 opens: the failed try, then the people list and that person's data.
+  check('If opening the database fails once, the next try works (not stuck)', retry.firstFailed && retry.recovered && retry.calls === 3, JSON.stringify(retry));
 
   // Full browser restart with the same profile: the real "close the app and come back tomorrow" test.
   const profile = newProfile();

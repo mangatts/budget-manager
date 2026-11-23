@@ -54,3 +54,37 @@ export function finish(result, message, href) {
   location.hash = href;
   return true;
 }
+
+// A form for something that can't be undone: the button only works once "DELETE" is typed.
+// onConfirm() returns { ok } or { ok: false, errors: { form } }; a failure is shown and the button comes back.
+export const CONFIRM_WORD = 'DELETE';
+export function confirmDeleteForm({ id, buttonLabel, content, onConfirm }) {
+  const input = el('input', { class: 'input', id: `${id}-confirm`, autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-describedby': `${id}-hint` });
+  const button = el('button', { class: 'btn btn-danger btn-block', type: 'submit', id: `${id}-button`, disabled: true }, buttonLabel);
+  const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
+  const form = el('form', { class: 'section', novalidate: true, id: `${id}-form` },
+    ...content,
+    el('div', { class: 'field' },
+      el('label', { class: 'field-label', for: `${id}-confirm` }, `Type ${CONFIRM_WORD} to confirm`),
+      input,
+      el('span', { class: 'field-hint', id: `${id}-hint` }, 'In capital letters'),
+    ),
+    error,
+    button,
+  );
+  const typed = () => input.value.trim() === CONFIRM_WORD;
+  input.addEventListener('input', () => { button.disabled = !typed(); });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!typed() || button.dataset.busy) return;
+    button.disabled = true;
+    button.dataset.busy = '1';
+    const result = await onConfirm();
+    delete button.dataset.busy;
+    if (result.ok) return;
+    error.textContent = result.errors.form;
+    error.hidden = false;
+    button.disabled = false;
+  });
+  return form;
+}
