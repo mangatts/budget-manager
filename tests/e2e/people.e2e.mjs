@@ -7,7 +7,8 @@ export async function peopleSuite({ page, check, base }) {
   const submit = async (id) => { await page.eval(`document.getElementById(${JSON.stringify(id)}).requestSubmit()`); await page.sleep(300); };
   const open = async (hash) => { await page.goto(`${base}${hash}`); await page.sleep(300); };
   const names = () => page.eval(`[...document.querySelectorAll('#people-list li')].map((li) => li.querySelector('.list-row-main span').textContent)`);
-  const idOf = (name) => page.eval(`[...document.querySelectorAll('#people-list li')].find((li) => li.textContent.includes(${JSON.stringify(name)}))?.dataset.person`);
+  const rows = () => page.eval(`[...document.querySelectorAll('#people-list li')].map((li) => [li.textContent, li.dataset.person])`);
+  const idOf = async (name) => (await rows()).find(([label]) => label.includes(name))?.[1];
   const databases = () => page.eval(`indexedDB.databases().then((list) => list.map((d) => d.name).sort())`);
   const addPerson = async (name) => { await setValue('person-name', name); await submit('person-form'); };
 
